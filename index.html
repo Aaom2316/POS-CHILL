@@ -123,69 +123,82 @@
     let step = 0;
 
     const steps = [
-
     {
         title: "💦 ฉีดน้ำ",
-        description: "ฉีดน้ำให้ทั่วตัวรถก่อนเริ่มใช้งาน",
-        media: "media/step1.jpg"
+        description: "ฉีดน้ำให้ทั่วตัวรถก่อนเริ่มใช้งาน"
     },
-
     {
         title: "🫧 ฉีดโฟม",
-        description: "ฉีดโฟมให้ทั่วตัวรถ",
-        media: "media/step2.jpg"
+        description: "ฉีดโฟมให้ทั่วตัวรถ"
     },
-
     {
         title: "💧 ล้างน้ำ",
-        description: "ล้างโฟมออกให้สะอาด",
-        media: "media/step3.mp4"
+        description: "ล้างโฟมออกให้สะอาด"
     },
-
     {
         title: "💨 เป่าลม",
-        description: "เป่าลมไล่น้ำออกจากตัวรถ",
-        media: "media/step4.mp4"
+        description: "เป่าลมไล่น้ำออกจากตัวรถ"
     },
-
     {
         title: "🧹 ดูดฝุ่น",
-        description: "ดูดฝุ่นภายในรถ",
-        media: "media/step5.jpg"
+        description: "ดูดฝุ่นภายในรถ"
     }
-
 ];
 
     function showStep() {
 
+    const current = steps[step];
+
     document.querySelector(".step").textContent =
-        "ขั้นตอนที่ " + (step + 1) + " — " + steps[step].title;
+        "ขั้นตอนที่ " + (step + 1) + " — " + current.title;
 
     document.querySelector(".description").textContent =
-        steps[step].description;
+        current.description;
 
-    const media = steps[step].media;
     const box = document.querySelector(".media");
+    const number = String(step + 1).padStart(2, "0");
 
-    if (media.endsWith(".mp4")) {
+    const jpg = `media/${number}.jpg`;
+    const mp4 = `media/${number}.mp4`;
 
-        box.innerHTML = `
-            <video
-                src="${media}"
-                autoplay
-                muted
-                loop
-                playsinline>
-            </video>
-        `;
+    const video = document.createElement("video");
 
-    } else {
+    video.src = mp4;
+    video.autoplay = true;
+    video.muted = true;
+    video.playsInline = true;
 
-        box.innerHTML = `
-            <img src="${media}">
-        `;
+    video.onloadeddata = function () {
 
-    }
+        box.innerHTML = "";
+        box.appendChild(video);
+
+    };
+
+    video.onerror = function () {
+
+        const img = new Image();
+
+        img.src = jpg;
+
+        img.onload = function () {
+
+            img.style.width = "100%";
+            img.style.height = "100%";
+            img.style.objectFit = "contain";
+
+            box.innerHTML = "";
+            box.appendChild(img);
+
+        };
+
+        img.onerror = function () {
+
+            box.innerHTML = "ไม่มีไฟล์สำหรับขั้นตอนนี้";
+
+        };
+
+    };
 }
 
     function nextStep() {
