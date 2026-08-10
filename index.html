@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>วิธีใช้งานเครื่องล้าง</title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+        }
+
+        body {
+            background: #000;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        .screen {
+            width: 100vw;
+            height: 100vh;
+
+            aspect-ratio: 16 / 9;
+
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+
+            text-align: center;
+        }
+
+        .title {
+            font-size: 4vw;
+            font-weight: bold;
+            margin-bottom: 4vh;
+        }
+
+        .step {
+            font-size: 3vw;
+            margin-bottom: 2vh;
+        }
+
+        .description {
+            font-size: 2vw;
+        }
+
+        .content {
+    width: 80vw;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.media {
+    width: 70vw;
+    height: 45vh;
+
+    border: 3px solid #fff;
+    border-radius: 15px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    font-size: 2vw;
+
+    margin-bottom: 3vh;
+}
+
+.media img,
+.media video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 12px;
+}
+
+    </style>
+</head>
+
+<body>
+
+    <div class="screen">
+
+    <div class="title">
+        🚗 วิธีใช้งานเครื่องล้างรถ
+    </div>
+
+    <div class="content">
+
+        <div class="media">
+            📺
+            <br>
+            พื้นที่สำหรับวิดีโอ
+        </div>
+
+        <div class="step">
+            ขั้นตอนที่ 1
+        </div>
+
+        <div class="description">
+            💦 ฉีดน้ำให้ทั่วตัวรถก่อนเริ่มใช้งาน
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+
+    let step = 0;
+
+    const steps = [
+
+    {
+        title: "💦 ฉีดน้ำ",
+        description: "ฉีดน้ำให้ทั่วตัวรถก่อนเริ่มใช้งาน",
+        media: "media/step1.jpg"
+    },
+
+    {
+        title: "🫧 ฉีดโฟม",
+        description: "ฉีดโฟมให้ทั่วตัวรถ",
+        media: "media/step2.jpg"
+    },
+
+    {
+        title: "💧 ล้างน้ำ",
+        description: "ล้างโฟมออกให้สะอาด",
+        media: "media/step3.mp4"
+    },
+
+    {
+        title: "💨 เป่าลม",
+        description: "เป่าลมไล่น้ำออกจากตัวรถ",
+        media: "media/step4.mp4"
+    },
+
+    {
+        title: "🧹 ดูดฝุ่น",
+        description: "ดูดฝุ่นภายในรถ",
+        media: "media/step5.jpg"
+    }
+
+];
+
+    function showStep() {
+
+    document.querySelector(".step").textContent =
+        "ขั้นตอนที่ " + (step + 1) + " — " + steps[step].title;
+
+    document.querySelector(".description").textContent =
+        steps[step].description;
+
+    const media = steps[step].media;
+    const box = document.querySelector(".media");
+
+    if (media.endsWith(".mp4")) {
+
+        box.innerHTML = `
+            <video
+                src="${media}"
+                autoplay
+                muted
+                loop
+                playsinline>
+            </video>
+        `;
+
+    } else {
+
+        box.innerHTML = `
+            <img src="${media}">
+        `;
+
+    }
+}
+
+    function nextStep() {
+
+        step++;
+
+        if (step >= steps.length) {
+            step = 0;
+        }
+
+        showStep();
+    }
+
+    showStep();
+
+    setInterval(nextStep, 10000);
+
+</script>
+
+</body>
+</html>
