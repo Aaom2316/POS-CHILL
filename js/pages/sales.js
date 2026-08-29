@@ -1168,15 +1168,27 @@ const todayOrderRows =
     );
 
 
-  const todayCash =
-    todayCashRows.reduce(
-      (sum,row) =>
-        sum +
-          Number(
-            row.total || 0
-          ),
-      0
-    );
+let todayCash =
+  todayCashRows.reduce(
+    (sum,row) =>
+      sum +
+        Number(
+          row.total || 0
+        ),
+    0
+  );
+
+
+// ===================================================
+// ถ้าปิดยอดแล้ว และวันทำการเป็นวันถัดไป
+// รับเงินจริงวันนี้ต้องเริ่มที่ 0
+// ===================================================
+
+if(businessDateIsFuture){
+
+  todayCash = 0;
+
+}
 
 
 // ===================================================
