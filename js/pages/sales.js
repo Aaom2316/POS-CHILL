@@ -2357,9 +2357,11 @@ const monthSalesRows = [
             "
           >
             ${money(
-              todayCash
-            )}
-            บาท
+            businessDateIsFuture
+              ? 0
+              : todayCash
+          )}
+          บาท
           </div>
 
 
@@ -2368,7 +2370,11 @@ const monthSalesRows = [
               pos-sales-summary-sub
             "
           >
-            ${paidRows.length}
+            ${
+              businessDateIsFuture
+                ? 0
+                : paidRows.length
+            }
             รายการที่ชำระแล้ว
           </div>
 
