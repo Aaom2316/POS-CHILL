@@ -3020,10 +3020,19 @@ window.POS.updatePendingBillSales =
 
           if(billCountEl){
 
-          billCountEl.textContent =
-            `${(bill.items || []).length} รายการ`;
+            const billItemQty =
+              (bill.items || [])
+                .reduce(
+                  (sum,item) =>
+                    sum +
+                    Number(item.qty || 0),
+                  0
+                );
 
-        }
+            billCountEl.textContent =
+              `${billItemQty} รายการ`;
+
+          }
 
 
         // -----------------------------------------------
