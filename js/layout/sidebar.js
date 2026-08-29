@@ -5,14 +5,8 @@
 POS.USER_ROLE = "STAFF";
 
 
-// OWNER UID
-// UID นี้ต้องเป็น UID ของเจ้าของที่ Login
-POS.OWNER_UID =
-  "e51d8adf-8a80-4df4-9e6a-6e6719a7a504";
-
-
 // ===================================================
-// ตรวจสิทธิ์จาก Session
+// โหลดสิทธิ์จาก public.users
 // ===================================================
 
 POS.loadUserRole = async function(){
@@ -23,10 +17,13 @@ POS.loadUserRole = async function(){
       await POS.auth.session();
 
 
+    // -----------------------------------------------
+    // ไม่มี Session
+    // -----------------------------------------------
+
     if(!session){
 
-      POS.USER_ROLE =
-        "STAFF";
+      POS.USER_ROLE = "STAFF";
 
       return;
 
@@ -37,20 +34,104 @@ POS.loadUserRole = async function(){
       session.user?.id;
 
 
-    if(
-      uid &&
-      uid === POS.OWNER_UID
-    ){
+    if(!uid){
 
-      POS.USER_ROLE =
-        "OWNER";
+      POS.USER_ROLE = "STAFF";
+
+      return;
+
+    }
+
+
+    // -----------------------------------------------
+    // อ่าน Role จาก public.users
+    // -----------------------------------------------
+
+    const result =
+      await POS.supabase
+
+        .from("users")
+
+        .select("role, active")
+
+        .eq("id", uid)
+
+        .maybeSingle();
+
+
+    console.log(
+      "USER ROLE RESULT:",
+      result
+    );
+
+
+    // -----------------------------------------------
+    // Database Error
+    // -----------------------------------------------
+
+    if(result.error){
+
+      console.error(
+        "USER ROLE DATABASE ERROR:",
+        result.error
+      );
+
+      POS.USER_ROLE = "STAFF";
+
+      return;
+
+    }
+
+
+    // -----------------------------------------------
+    // ไม่พบ User
+    // -----------------------------------------------
+
+    if(!result.data){
+
+      console.warn(
+        "USER NOT FOUND IN public.users"
+      );
+
+      POS.USER_ROLE = "STAFF";
+
+      return;
+
+    }
+
+
+    // -----------------------------------------------
+    // User ถูกปิดใช้งาน
+    // -----------------------------------------------
+
+    if(result.data.active !== true){
+
+      POS.USER_ROLE = "STAFF";
+
+      return;
+
+    }
+
+
+    // -----------------------------------------------
+    // กำหนด Role
+    // -----------------------------------------------
+
+    if(result.data.role === "OWNER"){
+
+      POS.USER_ROLE = "OWNER";
 
     }else{
 
-      POS.USER_ROLE =
-        "STAFF";
+      POS.USER_ROLE = "STAFF";
 
     }
+
+
+    console.log(
+      "POS USER ROLE:",
+      POS.USER_ROLE
+    );
 
 
   }catch(error){
@@ -60,13 +141,16 @@ POS.loadUserRole = async function(){
       error
     );
 
-    POS.USER_ROLE =
-      "STAFF";
+    POS.USER_ROLE = "STAFF";
 
   }
 
 };
 
+
+// ===================================================
+// SIDEBAR
+// ===================================================
 
 POS.renderSidebar = function(){
 
@@ -75,11 +159,13 @@ POS.renderSidebar = function(){
 
 
   return `
+
     <aside class="sidebar">
 
       <div class="brand">
         🍹 ล้างไป ชิลล์ไป
       </div>
+
 
       <nav class="nav">
 
@@ -90,12 +176,14 @@ POS.renderSidebar = function(){
           📊 Dashboard
         </a>
 
+
         <a
           class="nav-item"
           href="#pos"
         >
           🧾 POS
         </a>
+
 
         <a
           class="nav-item"
@@ -104,6 +192,7 @@ POS.renderSidebar = function(){
           🍽️ โต๊ะ / Orders
         </a>
 
+
         <a
           class="nav-item"
           href="#sales"
@@ -111,12 +200,14 @@ POS.renderSidebar = function(){
           💰 รายรับ
         </a>
 
+
         <a
           class="nav-item"
           href="#expenses"
         >
           💸 รายจ่าย
         </a>
+
 
         ${
           isOwner
@@ -129,12 +220,14 @@ POS.renderSidebar = function(){
               📦 สต็อก
             </a>
 
+
             <a
               class="nav-item"
               href="#reports"
             >
               📈 รายงาน
             </a>
+
 
             <a
               class="nav-item"
@@ -147,8 +240,11 @@ POS.renderSidebar = function(){
           : ""
         }
 
+
       </nav>
 
     </aside>
+
   `;
+
 };
