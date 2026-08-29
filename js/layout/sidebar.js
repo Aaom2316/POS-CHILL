@@ -30,49 +30,36 @@ POS.loadUserRole = async function(){
     }
 
 
-    const uid =
-      session.user?.id;
-
-
-    if(!uid){
-
-      POS.USER_ROLE = "STAFF";
-
-      return;
-
-    }
-
-
     // -----------------------------------------------
-    // อ่าน Role จาก public.users
+    // ขอข้อมูลผู้ใช้จาก Backend
+    // ไม่อ่าน public.users ตรงจาก Browser
     // -----------------------------------------------
 
     const result =
-      await POS.supabase
-
-        .from("users")
-
-        .select("role, active")
-
-        .eq("id", uid)
-
-        .maybeSingle();
+      await POS.supabase.functions.invoke(
+        "system",
+        {
+          body:{
+            action:"GET_CURRENT_USER"
+          }
+        }
+      );
 
 
     console.log(
-      "USER ROLE RESULT:",
+      "CURRENT USER RESULT:",
       result
     );
 
 
     // -----------------------------------------------
-    // Database Error
+    // Database / Function Error
     // -----------------------------------------------
 
     if(result.error){
 
       console.error(
-        "USER ROLE DATABASE ERROR:",
+        "GET CURRENT USER ERROR:",
         result.error
       );
 
@@ -83,14 +70,23 @@ POS.loadUserRole = async function(){
     }
 
 
+    const data =
+      result.data;
+
+
     // -----------------------------------------------
-    // ไม่พบ User
+    // Backend Error
     // -----------------------------------------------
 
-    if(!result.data){
+    if(
+      !data ||
+      data.success !== true ||
+      !data.user
+    ){
 
-      console.warn(
-        "USER NOT FOUND IN public.users"
+      console.error(
+        "GET CURRENT USER FAILED:",
+        data
       );
 
       POS.USER_ROLE = "STAFF";
@@ -104,7 +100,9 @@ POS.loadUserRole = async function(){
     // User ถูกปิดใช้งาน
     // -----------------------------------------------
 
-    if(result.data.active !== true){
+    if(
+      data.user.active !== true
+    ){
 
       POS.USER_ROLE = "STAFF";
 
@@ -117,7 +115,11 @@ POS.loadUserRole = async function(){
     // กำหนด Role
     // -----------------------------------------------
 
-    if(result.data.role === "OWNER"){
+    if(
+      String(
+        data.user.role || ""
+      ).toUpperCase() === "OWNER"
+    ){
 
       POS.USER_ROLE = "OWNER";
 
