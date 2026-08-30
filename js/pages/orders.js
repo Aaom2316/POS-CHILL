@@ -1750,8 +1750,50 @@ POS.ordersPaymentConfirm =
     // BILL ID
     // ================================================
 
-    const billId =
+    let billId =
       POS.tableBillIds?.[table];
+
+
+    // ------------------------------------------------
+    // ถ้าไม่มี BILL ID ใน Local Storage
+    // ให้หา BILL ID จาก Order จริงใน Database
+    // เพื่อรองรับบิลเก่าที่ข้ามวันมารับชำระ
+    // ------------------------------------------------
+
+    if(!billId){
+
+      const orderId =
+        items?.[0]?.orderId;
+
+
+      if(orderId){
+
+        const billResult =
+          await POS.supabase
+            .from("orders")
+            .select("remark,payment_status")
+            .eq(
+              "id",
+              orderId
+            )
+            .maybeSingle();
+
+
+        if(
+          !billResult.error &&
+          billResult.data?.payment_status === "UNPAID"
+        ){
+
+          billId =
+            String(
+              billResult.data.remark || ""
+            ).trim();
+
+        }
+
+      }
+
+    }
 
 
     if(!billId){
