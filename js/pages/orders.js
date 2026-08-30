@@ -886,6 +886,9 @@ const billId =
         orderId:
           result.order.id,
 
+        billId:
+          billId,
+
         id:
           menu.id,
 
