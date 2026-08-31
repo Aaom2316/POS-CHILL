@@ -197,17 +197,18 @@ POS.renderSidebar = function(){
 
         <a
           class="nav-item"
-          href="#sales"
+          href="#expenses"
         >
-          💰 รายรับ
+          💸 รายจ่าย
         </a>
+
 
 
         <a
           class="nav-item"
-          href="#expenses"
+          href="#sales"
         >
-          💸 รายจ่าย
+          💰 ยอดขาย
         </a>
 
 
