@@ -1605,10 +1605,143 @@ const monthSalesRows = [
 
 
   // ===================================================
-  // เงินสดสุทธิที่ต้องส่ง
+  // รายจ่ายสะสมของ "รอบนี้"
+  // ===================================================
+  // รอบเงินเริ่มจาก currentCashRound.started_at
+  // ดังนั้นรายจ่ายต้องนับตั้งแต่เวลาเริ่มรอบเหมือนกัน
+  // ไม่ใช้ dailyClosedAt เป็นตัวตัดรอบ
+  //
+  // เมื่อกด "เริ่มรอบใหม่" started_at จะเปลี่ยนเป็นเวลาใหม่
+  // รายจ่ายของรอบเก่าจึงไม่ติดมารอบใหม่
+  // ===================================================
+
+  const roundRegularExpenses =
+    expenseRows.filter(
+      item => {
+
+        const expenseType =
+          String(
+            item.expense_type ||
+            ""
+          ).toUpperCase();
+
+        if(
+          expenseType !==
+          "CASH_EXPENSE"
+        ){
+          return false;
+        }
+
+        // -----------------------------------------------
+        // เวลาเกิดรายจ่าย
+        // ใช้ created_at เป็นหลัก
+        // fallback เป็น updated_at
+        // -----------------------------------------------
+        const expenseCreatedAt =
+          item.created_at ||
+          item.updated_at ||
+          null;
+
+        // -----------------------------------------------
+        // มีรอบปัจจุบัน
+        // เอาเฉพาะรายจ่ายตั้งแต่เริ่มรอบ
+        // -----------------------------------------------
+        if(
+          roundStartAt &&
+          !isNaN(
+            roundStartAt.getTime()
+          )
+        ){
+
+          if(
+            !expenseCreatedAt
+          ){
+            return false;
+          }
+
+          const expenseDate =
+            new Date(
+              expenseCreatedAt
+            );
+
+          if(
+            isNaN(
+              expenseDate.getTime()
+            )
+          ){
+            return false;
+          }
+
+          return (
+            expenseDate.getTime() >=
+            roundStartAt.getTime()
+          );
+
+        }
+
+        // -----------------------------------------------
+        // ยังไม่มีรอบ
+        // fallback ใช้รายจ่ายของวันทำการปัจจุบัน
+        // -----------------------------------------------
+        const expenseDate =
+          String(
+            item.expense_date ||
+            ""
+          ).substring(
+            0,
+            10
+          );
+
+        return (
+          expenseDate ===
+          String(today).substring(
+            0,
+            10
+          )
+        );
+
+      }
+    );
+
+
+  // ===================================================
+  // รวมรายจ่ายสะสมของรอบนี้
+  // ===================================================
+
+  const roundExpenseTotal =
+    roundRegularExpenses.reduce(
+      (sum,item) =>
+        sum +
+        Number(
+          item.amount || 0
+        ),
+      0
+    );
+
+
+  // ===================================================
+  // เงินสุทธิรอบนี้
+  // ===================================================
+  // รับเงินจริงรอบนี้ - รายจ่ายสะสมรอบนี้
+  // ตัวอย่าง 138 - 40 = 98 บาท
+  // ใช้สำหรับการ์ด "เงินสุทธิรอบนี้" เท่านั้น
   // ===================================================
 
   const netCash =
+    monthCash -
+    roundExpenseTotal;
+
+
+  // ===================================================
+  // เงินสุทธิที่ต้องส่งวันนี้
+  // ===================================================
+  // ตัวนี้เป็นของ "แต่ละวัน" ไม่ใช่ของรอบ
+  // เมื่อปิดยอดแล้ว todayCash / todayRegularExpenseTotal
+  // จะถูกตัดเป็น 0 ตามวันใหม่ ดังนั้นช่องนี้ต้องรีเซตเป็น 0
+  // ไม่ใช้ netCash ซึ่งเป็นยอดสะสมของรอบ
+  // ===================================================
+
+  const dailyNetCash =
     todayCash -
     todayRegularExpenseTotal;
 
@@ -2175,6 +2308,128 @@ const monthSalesRows = [
 
       }
 
+
+
+      /* =================================================
+         SALES TABS
+         ================================================= */
+
+      .pos-sales-tabs{
+        display:flex;
+        gap:10px;
+        margin-top:22px;
+        margin-bottom:22px;
+        padding:6px;
+        background:#f1f5f9;
+        border-radius:16px;
+        width:fit-content;
+      }
+
+      .pos-sales-tab{
+        border:none;
+        border-radius:12px;
+        padding:12px 22px;
+        background:transparent;
+        color:#64748b;
+        font-family:inherit;
+        font-size:16px;
+        font-weight:800;
+        cursor:pointer;
+        transition:.2s;
+      }
+
+      .pos-sales-tab:hover{
+        background:#e2e8f0;
+        color:#334155;
+      }
+
+      .pos-sales-tab.active{
+        background:#ffffff;
+        color:#2563eb;
+        box-shadow:0 4px 12px rgba(15,23,42,.08);
+      }
+
+      .pos-sales-tab-panel{
+        width:100%;
+      }
+
+      .pos-sales-history{
+        background:#ffffff;
+        border-radius:22px;
+        padding:10px 25px 25px;
+        box-shadow:0 8px 25px rgba(0,0,0,.04);
+      }
+
+      .pos-sales-history-title{
+        font-size:24px;
+        font-weight:900;
+        color:#1e293b;
+        padding:20px 0 15px;
+      }
+
+      .pos-sales-history-table-wrap{
+        width:100%;
+        overflow-x:auto;
+        -webkit-overflow-scrolling:touch;
+      }
+
+      .pos-sales-history-table{
+        width:100%;
+        min-width:900px;
+        border-collapse:collapse;
+      }
+
+      .pos-sales-history-table th{
+        padding:14px 12px;
+        background:#f8fafc;
+        color:#475569;
+        font-size:14px;
+        font-weight:800;
+        text-align:left;
+        white-space:nowrap;
+        border-bottom:1px solid #e2e8f0;
+      }
+
+      .pos-sales-history-table td{
+        padding:15px 12px;
+        color:#334155;
+        font-size:15px;
+        font-weight:600;
+        border-bottom:1px solid #e2e8f0;
+        white-space:nowrap;
+      }
+
+      .pos-sales-history-table tr:last-child td{
+        border-bottom:none;
+      }
+
+      .pos-sales-history-money{
+        text-align:right;
+        font-weight:900;
+      }
+
+      .pos-sales-history-difference{
+        font-weight:900;
+      }
+
+      .pos-sales-history-difference.over{color:#ea580c;}
+      .pos-sales-history-difference.short{color:#dc2626;}
+      .pos-sales-history-difference.equal{color:#16a34a;}
+
+      .pos-sales-history-empty,
+      .pos-sales-history-loading{
+        text-align:center;
+        padding:45px 20px;
+        color:#94a3b8;
+        font-size:18px;
+        font-weight:700;
+      }
+
+      @media(max-width:700px){
+        .pos-sales-tabs{width:100%;}
+        .pos-sales-tab{flex:1;padding:11px 12px;font-size:14px;}
+        .pos-sales-history{padding-left:15px;padding-right:15px;}
+      }
     </style>
 
 
@@ -2202,10 +2457,38 @@ const monthSalesRows = [
 
 
       <!-- =================================================
+           SALES TABS
+           ================================================= -->
+
+      <div class="pos-sales-tabs" role="tablist">
+
+        <button
+          type="button"
+          id="posSalesTabButton"
+          class="pos-sales-tab active"
+          onclick="POS.salesTab('sales')"
+        >
+          📊 ยอดขาย
+        </button>
+
+        <button
+          type="button"
+          id="posHistoryTabButton"
+          class="pos-sales-tab"
+          onclick="POS.salesTab('history')"
+        >
+          🧾 ประวัติปิดยอด
+        </button>
+
+      </div>
+
+
+      <!-- =================================================
            SUMMARY 4 CARDS
            ================================================= -->
 
       <div
+        id="posSalesMainSummary"
         class="pos-sales-summary"
       >
 
@@ -2397,7 +2680,7 @@ const monthSalesRows = [
               pos-sales-summary-label
             "
           >
-            💳 รับเงินจริงรอบนี้
+            💰 เงินสุทธิรอบนี้
           </div>
 
 
@@ -2407,7 +2690,7 @@ const monthSalesRows = [
             "
           >
             ${money(
-              monthCash
+              netCash
             )}
             บาท
           </div>
@@ -2468,6 +2751,7 @@ const monthSalesRows = [
            ================================================= -->
 
       <div
+        id="posSalesClosePanel"
         class="
           pos-sales-close-panel
         "
@@ -2651,7 +2935,7 @@ const monthSalesRows = [
             "
           >
             ${money(
-              netCash
+              dailyNetCash
             )}
             บาท
           </div>
@@ -2667,6 +2951,7 @@ const monthSalesRows = [
            ================================================= -->
 
       <div
+        id="posSalesListPanel"
         class="
           pos-sales-list
         "
@@ -2845,11 +3130,577 @@ const monthSalesRows = [
       </div>
 
 
+      <!-- =================================================
+           DAILY CLOSING HISTORY
+           ================================================= -->
+
+      <div
+        id="posSalesHistoryPanel"
+        class="pos-sales-tab-panel"
+        style="display:none;"
+      >
+
+        <div class="pos-sales-history">
+
+          <div class="pos-sales-history-title">
+            🧾 ประวัติปิดยอด
+          </div>
+
+          <div
+            id="posSalesHistoryContent"
+            class="pos-sales-history-loading"
+          >
+            กำลังโหลดประวัติปิดยอด...
+          </div>
+
+        </div>
+
+      </div>
+
+
     </div>
 
   `;
 
 };
+
+// =====================================================
+// SALES TABS
+// =====================================================
+
+window.POS = window.POS || {};
+
+POS.salesTab = async function(tab){
+
+  const summary = document.getElementById("posSalesMainSummary");
+  const closePanel = document.getElementById("posSalesClosePanel");
+  const listPanel = document.getElementById("posSalesListPanel");
+  const historyPanel = document.getElementById("posSalesHistoryPanel");
+  const salesButton = document.getElementById("posSalesTabButton");
+  const historyButton = document.getElementById("posHistoryTabButton");
+
+  if(!summary || !closePanel || !listPanel || !historyPanel) return;
+
+  if(tab === "history"){
+    summary.style.display = "none";
+    closePanel.style.display = "none";
+    listPanel.style.display = "none";
+    historyPanel.style.display = "block";
+
+    salesButton?.classList.remove("active");
+    historyButton?.classList.add("active");
+
+    await POS.loadDailyClosingHistory();
+    return;
+  }
+
+  summary.style.display = "grid";
+  closePanel.style.display = "block";
+  listPanel.style.display = "block";
+  historyPanel.style.display = "none";
+
+  historyButton?.classList.remove("active");
+  salesButton?.classList.add("active");
+
+};
+
+// =====================================================
+// LOAD DAILY CLOSING HISTORY
+// =====================================================
+
+POS.loadDailyClosingHistory = async function(){
+
+  const content =
+    document.getElementById(
+      "posSalesHistoryContent"
+    );
+
+  if(!content){
+    return;
+  }
+
+  content.className =
+    "pos-sales-history-loading";
+
+  content.innerHTML =
+    "กำลังโหลดประวัติปิดยอด...";
+
+
+  try{
+
+    // =================================================
+    // ใช้ SYSTEM API
+    // ห้ามอ่าน daily_closings / users ตรงจาก Frontend
+    // =================================================
+
+    const result =
+      await POS.api.call(
+        POS_CONFIG.FUNCTION_NAMES.SYSTEM,
+        {
+          method:"POST",
+
+          body:{
+            action:
+              "GET_DAILY_CLOSING_HISTORY"
+          }
+        }
+      );
+
+
+    if(
+      !result ||
+      result.success !== true
+    ){
+
+      throw new Error(
+        result?.error ||
+        "โหลดประวัติปิดยอดไม่สำเร็จ"
+      );
+
+    }
+
+
+    const rows =
+      Array.isArray(
+        result.closings
+      )
+        ? result.closings
+        : [];
+
+
+    if(!rows.length){
+
+      content.className =
+        "pos-sales-history-empty";
+
+      content.innerHTML =
+        "ยังไม่มีประวัติการปิดยอด";
+
+      return;
+
+    }
+
+
+    const money =
+      value =>
+        Number(
+          value || 0
+        ).toLocaleString(
+          "th-TH",
+          {
+            minimumFractionDigits:0,
+            maximumFractionDigits:2
+          }
+        );
+
+
+    const escapeHtml =
+      value =>
+        String(
+          value ?? ""
+        )
+          .replace(
+            /&/g,
+            "&amp;"
+          )
+          .replace(
+            /</g,
+            "&lt;"
+          )
+          .replace(
+            />/g,
+            "&gt;"
+          )
+          .replace(
+            /"/g,
+            "&quot;"
+          )
+          .replace(
+            /'/g,
+            "&#039;"
+          );
+
+
+    const dateOnly =
+      value => {
+
+        if(!value){
+          return "-";
+        }
+
+        const d =
+          new Date(value);
+
+        if(
+          isNaN(
+            d.getTime()
+          )
+        ){
+          return escapeHtml(value);
+        }
+
+        return d.toLocaleDateString(
+          "th-TH",
+          {
+            timeZone:
+              "Asia/Bangkok",
+
+            day:
+              "2-digit",
+
+            month:
+              "2-digit",
+
+            year:
+              "numeric"
+          }
+        );
+
+      };
+
+
+    const dateTime =
+      value => {
+
+        if(!value){
+          return "-";
+        }
+
+        const d =
+          new Date(value);
+
+        if(
+          isNaN(
+            d.getTime()
+          )
+        ){
+          return escapeHtml(value);
+        }
+
+        return d.toLocaleString(
+          "th-TH",
+          {
+            timeZone:
+              "Asia/Bangkok",
+
+            day:
+              "2-digit",
+
+            month:
+              "2-digit",
+
+            year:
+              "numeric",
+
+            hour:
+              "2-digit",
+
+            minute:
+              "2-digit",
+
+            hour12:false
+          }
+        );
+
+      };
+
+
+    const differenceText =
+      value => {
+
+        const n =
+          Number(
+            value || 0
+          );
+
+        if(n > 0){
+
+          return (
+            "เกิน " +
+            money(n)
+          );
+
+        }
+
+        if(n < 0){
+
+          return (
+            "ขาด " +
+            money(
+              Math.abs(n)
+            )
+          );
+
+        }
+
+        return "ตรง";
+
+      };
+
+
+    const differenceClass =
+      value => {
+
+        const n =
+          Number(
+            value || 0
+          );
+
+        return (
+          n > 0
+            ? "over"
+            : n < 0
+              ? "short"
+              : "equal"
+        );
+
+      };
+
+
+    const html = `
+
+      <div
+        class="pos-sales-history-table-wrap"
+      >
+
+        <table
+          class="pos-sales-history-table"
+        >
+
+          <thead>
+
+            <tr>
+
+              <th>วันที่ปิดยอด</th>
+
+              <th>เวลาปิด</th>
+
+              <th>ยอดขาย</th>
+
+              <th>รับเงินจริง</th>
+
+              <th>รายจ่าย</th>
+
+              <th>เงินสดนับจริง</th>
+
+              <th>ส่วนต่าง</th>
+
+              <th>ผู้ปิดยอด</th>
+
+              <th>หมายเหตุ</th>
+
+            </tr>
+
+          </thead>
+
+          <tbody>
+
+            ${
+              rows
+                .map(
+                  row => {
+
+                    // -------------------------------------------------
+                    // เงินสดนับจริง
+                    // จุดนี้แก้เฉพาะช่อง "เงินสดนับจริง" เท่านั้น
+                    //
+                    // ถ้า remark มีข้อความ:
+                    // "นับเงินจริง: 60.00 บาท | เงินเกิน 11.00 บาท"
+                    // ให้ใช้ 60 เป็นค่าที่แสดง
+                    //
+                    // ห้ามใช้ net_cash เป็นเงินสดนับจริง
+                    // -------------------------------------------------
+
+                    const remarkText =
+                      String(
+                        row.remark ||
+                        ""
+                      );
+
+                    const countedMatch =
+                      remarkText.match(
+                        /นับเงินจริง\s*:\s*([0-9,]+(?:\.[0-9]+)?)\s*บาท/
+                      );
+
+                    const cashCounted =
+                      countedMatch
+                        ? Number(
+                            String(
+                              countedMatch[1]
+                            ).replace(
+                              /,/g,
+                              ""
+                            )
+                          )
+                        : Number(
+                            row.cash_counted ??
+                            0
+                          );
+
+
+                    // -------------------------------------------------
+                    // ส่วนต่าง
+                    // คำนวณจาก เงินสดนับจริง - เงินที่ระบบควรเหลือ
+                    // เพื่อให้ประวัติถูกต้อง แม้ cash_difference ใน DB จะเป็น 0
+                    // -------------------------------------------------
+
+                    const expectedCash =
+                      Number(
+                        row.net_cash ??
+                        (Number(row.cash_received || 0) -
+                         Number(row.regular_expense || 0))
+                      );
+
+                    const difference =
+                      Math.round(
+                        (cashCounted - expectedCash) * 100
+                      ) / 100;
+
+
+                    const closedBy =
+                      row.closed_by_name ||
+                      row.user_name ||
+                      "-";
+
+
+                    return `
+
+                      <tr>
+
+                        <td>
+                          ${dateOnly(
+                            row.close_date
+                          )}
+                        </td>
+
+                        <td>
+                          ${dateTime(
+                            row.closed_at
+                          )}
+                        </td>
+
+                        <td
+                          class="
+                            pos-sales-history-money
+                          "
+                        >
+                          ${money(
+                            row.sales_total
+                          )}
+                          บาท
+                        </td>
+
+                        <td
+                          class="
+                            pos-sales-history-money
+                          "
+                        >
+                          ${money(
+                            row.cash_received
+                          )}
+                          บาท
+                        </td>
+
+                        <td
+                          class="
+                            pos-sales-history-money
+                          "
+                        >
+                          ${money(
+                            row.regular_expense
+                          )}
+                          บาท
+                        </td>
+
+                        <td
+                          class="
+                            pos-sales-history-money
+                          "
+                        >
+                          ${money(
+                            cashCounted
+                          )}
+                          บาท
+                        </td>
+
+                        <td
+                          class="
+                            pos-sales-history-money
+                            pos-sales-history-difference
+                            ${differenceClass(
+                              difference
+                            )}
+                          "
+                        >
+                          ${differenceText(
+                            difference
+                          )}
+                          บาท
+                        </td>
+
+                        <td>
+                          ${escapeHtml(
+                            closedBy
+                          )}
+                        </td>
+
+                        <td>
+                          ${escapeHtml(
+                            row.remark ||
+                            "-"
+                          )}
+                        </td>
+
+                      </tr>
+
+                    `;
+
+                  }
+                )
+                .join("")
+            }
+
+          </tbody>
+
+        </table>
+
+      </div>
+
+    `;
+
+
+    content.className =
+      "pos-sales-history-content";
+
+    content.innerHTML =
+      html;
+
+
+  }catch(error){
+
+    console.error(
+      "LOAD DAILY CLOSING HISTORY ERROR:",
+      error
+    );
+
+    content.className =
+      "pos-sales-history-empty";
+
+    content.innerHTML = `
+      ไม่สามารถโหลดประวัติปิดยอดได้
+      <br>
+      <small>
+        ${escapeHtml(
+          error?.message ||
+          "เกิดข้อผิดพลาด"
+        )}
+      </small>
+    `;
+
+  }
+
+};
+
 
 // =====================================================
 // START NEW CASH ROUND
@@ -5213,4 +6064,3 @@ document
     );
 
   }  
-
