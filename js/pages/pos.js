@@ -6202,9 +6202,14 @@ const menus =
 
 
     const sales =
-      Array.isArray(result.sales)
-        ? result.sales
-        : [];
+  Array.isArray(result.sales)
+    ? result.sales.filter(
+        row =>
+          String(
+            row.payment_status || ""
+          ).toUpperCase() === "PAID"
+      )
+    : [];
 
 
     // -----------------------------------------------
