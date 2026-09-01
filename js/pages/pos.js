@@ -87,20 +87,144 @@ POS.pages.pos = async function () {
     // =====================================================
     // LOAD PENDING BILLS
     // =====================================================
+    //
+    // FIX:
+    // บิลค้างต้องอ่านจาก Backend เพื่อให้ทุกเครื่องเห็นข้อมูลชุดเดียวกัน
+    // localStorage ใช้เป็น cache สำรองเท่านั้น
+    // =====================================================
 
     if(!Array.isArray(window.POS.pendingBills)){
 
       try{
 
-        const savedBills =
-          localStorage.getItem(
-            PENDING_BILLS_STORAGE_KEY
-          );
+        // ---------------------------------------------
+        // LOAD PENDING SALES FROM BACKEND
+        // ---------------------------------------------
 
-        window.POS.pendingBills =
-          savedBills
-            ? JSON.parse(savedBills)
-            : [];
+        const salesResult =
+          await POS.api.salesList();
+
+        if(
+          salesResult &&
+          salesResult.success === true &&
+          Array.isArray(salesResult.sales)
+        ){
+
+          const menusResult =
+            await POS.api.menus();
+
+          const menus =
+            menusResult?.menus || [];
+
+          const bills = {};
+
+          salesResult.sales
+            .filter(
+              row =>
+                String(
+                  row.payment_status || ""
+                ).toUpperCase() === "UNPAID"
+            )
+            .forEach(row => {
+
+              const billId =
+                String(
+                  row.remark || ""
+                ).trim();
+
+              if(!billId){
+                return;
+              }
+
+              const menu =
+                menus.find(
+                  m =>
+                    String(m.id) ===
+                    String(row.menu_id)
+                );
+
+              if(!bills[billId]){
+
+                bills[billId] = {
+                  billId:
+                    billId,
+
+                  createdAt:
+                    row.sold_at ||
+                    row.created_at ||
+                    null,
+
+                  items: [],
+
+                  total: 0,
+
+                  status:
+                    "UNPAID"
+                };
+
+              }
+
+              bills[billId].items.push({
+
+                sku:
+                  menu?.sku ||
+                  row.sku ||
+                  "",
+
+                name:
+                  menu?.name ||
+                  row.menu_name ||
+                  "ไม่พบชื่อเมนู",
+
+                price:
+                  Number(
+                    row.unit_price || 0
+                  ),
+
+                emoji:
+                  menu?.emoji ||
+                  "🍹",
+
+                qty:
+                  Number(
+                    row.qty || 0
+                  )
+
+              });
+
+              bills[billId].total +=
+                Number(
+                  row.total || 0
+                );
+
+            });
+
+          window.POS.pendingBills =
+            Object.values(bills);
+
+          // ---------------------------------------------
+          // เก็บเป็น cache สำรองของเครื่องนี้
+          // ---------------------------------------------
+
+          savePendingBills();
+
+        }else{
+
+          // ---------------------------------------------
+          // BACKEND ใช้งานไม่ได้ → ใช้ cache เดิม
+          // ---------------------------------------------
+
+          const savedBills =
+            localStorage.getItem(
+              PENDING_BILLS_STORAGE_KEY
+            );
+
+          window.POS.pendingBills =
+            savedBills
+              ? JSON.parse(savedBills)
+              : [];
+
+        }
 
       }catch(error){
 
@@ -109,11 +233,37 @@ POS.pages.pos = async function () {
           error
         );
 
-        window.POS.pendingBills = [];
+        // ---------------------------------------------
+        // FALLBACK: ใช้ cache เดิมถ้า Backend error
+        // ---------------------------------------------
+
+        try{
+
+          const savedBills =
+            localStorage.getItem(
+              PENDING_BILLS_STORAGE_KEY
+            );
+
+          window.POS.pendingBills =
+            savedBills
+              ? JSON.parse(savedBills)
+              : [];
+
+        }catch(cacheError){
+
+          console.error(
+            "LOAD PENDING BILLS CACHE ERROR:",
+            cacheError
+          );
+
+          window.POS.pendingBills = [];
+
+        }
 
       }
 
     }
+
 
 
     // =====================================================
