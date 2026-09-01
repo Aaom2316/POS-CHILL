@@ -93,16 +93,17 @@ POS.pages.pos = async function () {
     // localStorage ใช้เป็น cache สำรองเท่านั้น
     // =====================================================
 
-    if(!Array.isArray(window.POS.pendingBills)){
+    // โหลดจาก Backend ทุกครั้งที่เปิดหน้า POS
+    // เพื่อไม่ให้ข้อมูลเก่าจาก window.POS / localStorage
+    // ทำให้เครื่องอื่นไม่เห็นบิลค้างล่าสุด
+    try{
 
-      try{
+      // ---------------------------------------------
+      // LOAD PENDING SALES FROM BACKEND
+      // ---------------------------------------------
 
-        // ---------------------------------------------
-        // LOAD PENDING SALES FROM BACKEND
-        // ---------------------------------------------
-
-        const salesResult =
-          await POS.api.salesList();
+      const salesResult =
+        await POS.api.salesList();
 
         if(
           salesResult &&
@@ -261,8 +262,6 @@ POS.pages.pos = async function () {
         }
 
       }
-
-    }
 
 
 
