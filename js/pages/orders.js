@@ -89,29 +89,30 @@ POS.ordersLoadDatabase = async function(){
       // โหลด Orders ของโต๊ะ 1-6 จาก Database พร้อมกัน
       // -----------------------------------------------
 
-      const results =
-        await Promise.all(
-          [1,2,3,4,5,6].map(async table => {
+      const results = [];
 
-            const result =
-              await POS.api.call(
-                POS_CONFIG.FUNCTION_NAMES.ORDERS,
-                {
-                  method: "POST",
-                  body: {
-                    action: "LIST",
-                    table_no: table
-                  }
-                }
-              );
+      // โหลดทีละโต๊ะ เพื่อไม่ยิง Orders API พร้อมกัน 6 คำขอ
+      // ลดโอกาสชนกับการ refresh session / auth ของ Supabase
+      for(const table of [1,2,3,4,5,6]){
 
-            return {
-              table,
-              result
-            };
+        const result =
+          await POS.api.call(
+            POS_CONFIG.FUNCTION_NAMES.ORDERS,
+            {
+              method: "POST",
+              body: {
+                action: "LIST",
+                table_no: table
+              }
+            }
+          );
 
-          })
-        );
+        results.push({
+          table,
+          result
+        });
+
+      }
 
 
       // -----------------------------------------------
