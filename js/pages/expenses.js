@@ -787,12 +787,10 @@ POS.pages.expenses = async function(){
       typeof POS.loadExpenses ===
       "function"
     ){
-
       POS.loadExpenses();
-
     }
 
-  }, 0);
+  }, 100);
 
 
   return html;
@@ -1486,45 +1484,87 @@ POS.loadExpenses = async function(){
 
   try{
 
+    // รอให้หน้า รายจ่ายถูกใส่เข้า DOM จริงก่อน
+    let ready = false;
+
+    for(let i = 0; i < 30; i++){
+
+      if(
+        document.getElementById("expensesRegularArea") ||
+        document.getElementById("expensesShopArea")
+      ){
+        ready = true;
+        break;
+      }
+
+      await new Promise(resolve =>
+        setTimeout(resolve,100)
+      );
+
+    }
+
+    if(!ready){
+      throw new Error(
+        "ไม่พบพื้นที่แสดงรายการรายจ่าย"
+      );
+    }
+
     const result =
       await POS.api.expensesList();
-
 
     if(
       !result ||
       result.success !== true
     ){
-
       throw new Error(
         result?.error ||
         "โหลดรายการรายจ่ายไม่สำเร็จ"
       );
-
     }
 
-
+    // รองรับทั้ง response แบบตรงและแบบห่อ data
     const expenses =
-      result.expenses || [];
+      Array.isArray(result.expenses)
+        ? result.expenses
+        : Array.isArray(result?.data?.expenses)
+          ? result.data.expenses
+          : [];
 
+    POS.expensesList = expenses;
 
-    // เก็บไว้ใช้ตอนเปลี่ยนแท็บ
+    // render ทั้ง 2 แท็บทันที
+    POS.renderExpenses("regular");
+    POS.renderExpenses("shop");
 
-    POS.expensesList =
-      expenses;
-
-
-    // แสดงแท็บปัจจุบัน
-
+    // กลับมาแสดงแท็บที่ผู้ใช้กำลังเลือก
     const currentType =
       POS.currentExpenseType === "shop"
         ? "shop"
         : "regular";
 
+    const regularArea =
+      document.getElementById(
+        "expensesRegularArea"
+      );
 
-    POS.renderExpenses(
-      currentType
-    );
+    const shopArea =
+      document.getElementById(
+        "expensesShopArea"
+      );
 
+    if(regularArea){
+      regularArea.style.display =
+        currentType === "regular"
+          ? "block"
+          : "none";
+    }
+
+    if(shopArea){
+      shopArea.style.display =
+        currentType === "shop"
+          ? "block"
+          : "none";
+    }
 
   }catch(error){
 
@@ -1533,29 +1573,21 @@ POS.loadExpenses = async function(){
       error
     );
 
-
     const area =
       currentExpenseArea();
 
-
     if(area){
-
       area.innerHTML = `
-
         <div
           class="pos-expense-empty"
         >
           โหลดรายการรายจ่ายไม่สำเร็จ
         </div>
-
       `;
-
     }
 
   }
-
 };
-
 
 // =================================================
 // GET CURRENT AREA
