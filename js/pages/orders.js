@@ -48,9 +48,9 @@ POS.ordersLoadStorage = function(){
    Local Storage ใช้เป็น cache เท่านั้น
    ===================================================== */
 
-POS.ordersLoadDatabase = async function(){
+POS.ordersLoadDatabase = async function(force = false){
 
-  if(POS.__ordersDatabaseLoading){
+  if(!force && POS.__ordersDatabaseLoading){
     return POS.__ordersDatabaseLoading;
   }
 
@@ -70,19 +70,27 @@ POS.ordersLoadDatabase = async function(){
       // โหลดเมนู เพื่อแปลง menu_id เป็นข้อมูลที่หน้าเว็บใช้
       // -----------------------------------------------
 
-      const menuResult =
-        await POS.api.menus();
+      let menuMap =
+        POS.__ordersMenuMap || null;
 
-      const menus =
-        Array.isArray(menuResult?.menus)
-          ? menuResult.menus
-          : [];
+      if(!menuMap){
 
-      const menuMap = {};
+        const menuResult =
+          await POS.api.menus();
 
-      menus.forEach(menu => {
-        menuMap[String(menu.id)] = menu;
-      });
+        const menus =
+          Array.isArray(menuResult?.menus)
+            ? menuResult.menus
+            : [];
+
+        menuMap = {};
+
+        menus.forEach(menu => {
+          menuMap[String(menu.id)] = menu;
+        });
+
+        POS.__ordersMenuMap = menuMap;
+      }
 
 
       // -----------------------------------------------
@@ -420,20 +428,24 @@ POS.ordersOpenTable = async function(table){
   detailArea.style.display = "block";
 
   // -----------------------------------------------
-  // เปิดโต๊ะ -> อ่าน Database ล่าสุดอีกครั้ง
-  // เพื่อให้ทุกเครื่องเห็นข้อมูลชุดเดียวกัน
+  // แสดงข้อมูลทันทีจาก cache / state ปัจจุบัน
+  // แล้วค่อย sync Database เบื้องหลัง
+  // ไม่ต้องรอ Server ก่อนเปิดโต๊ะ
   // -----------------------------------------------
 
-  const loaded =
-    await POS.ordersLoadDatabase();
-
-  if(!loaded){
-    console.warn(
-      "ใช้ Local Storage ชั่วคราว เพราะโหลด Database ไม่สำเร็จ"
-    );
-  }
-
   POS.ordersRenderCart();
+
+  POS.ordersLoadDatabase(true)
+    .then(() => {
+      POS.ordersRenderCart();
+      POS.ordersRenderTables();
+    })
+    .catch(error => {
+      console.warn(
+        "BACKGROUND ORDERS SYNC ERROR:",
+        error
+      );
+    });
 
   POS.ordersRenderTables();
 
@@ -2352,13 +2364,24 @@ POS.ordersBackFromMenu = function(){
    PAGE : ORDERS
    ===================================================== */
 
-POS.pages.orders = async function(){
+POS.pages.orders = function(){
 
   // Local Storage ใช้เป็น cache เท่านั้น
+  // แสดงหน้าโต๊ะทันที ไม่รอ Database
   POS.ordersLoadStorage();
 
-  // โหลดข้อมูลจริงจาก Database ก่อนแสดงหน้าโต๊ะ
-  await POS.ordersLoadDatabase();
+  // Sync Database เบื้องหลัง
+  // เมื่อเสร็จแล้วค่อยอัปเดตการ์ดโต๊ะ
+  POS.ordersLoadDatabase(true)
+    .then(() => {
+      POS.ordersRenderTables();
+    })
+    .catch(error => {
+      console.warn(
+        "BACKGROUND ORDERS PAGE SYNC ERROR:",
+        error
+      );
+    });
 
   return `
 
