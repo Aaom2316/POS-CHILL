@@ -91,26 +91,52 @@ POS.ordersLoadDatabase = async function(){
 
       const results = [];
 
-      // โหลดทีละโต๊ะ เพื่อไม่ยิง Orders API พร้อมกัน 6 คำขอ
-      // ลดโอกาสชนกับการ refresh session / auth ของ Supabase
-      for(const table of [1,2,3,4,5,6]){
+      // โหลดทีละ 2 โต๊ะพร้อมกัน
+      // เร็วกว่ารอทีละโต๊ะ แต่ไม่ยิง 6 คำขอพร้อมกัน
+      // เพื่อไม่เพิ่มภาระ Auth / Edge Function มากเกินไป
+      const tablesToLoad = [1,2,3,4,5,6];
 
-        const result =
-          await POS.api.call(
-            POS_CONFIG.FUNCTION_NAMES.ORDERS,
-            {
-              method: "POST",
-              body: {
-                action: "LIST",
-                table_no: table
-              }
-            }
+      for(
+        let i = 0;
+        i < tablesToLoad.length;
+        i += 2
+      ){
+
+        const batch =
+          tablesToLoad.slice(
+            i,
+            i + 2
           );
 
-        results.push({
-          table,
-          result
-        });
+        const batchResults =
+          await Promise.all(
+            batch.map(
+              async table => {
+
+                const result =
+                  await POS.api.call(
+                    POS_CONFIG.FUNCTION_NAMES.ORDERS,
+                    {
+                      method: "POST",
+                      body: {
+                        action: "LIST",
+                        table_no: table
+                      }
+                    }
+                  );
+
+                return {
+                  table,
+                  result
+                };
+
+              }
+            )
+          );
+
+        results.push(
+          ...batchResults
+        );
 
       }
 
@@ -1351,7 +1377,7 @@ POS.ordersRenderCart = function(){
    เปลี่ยนจำนวนสินค้าในโต๊ะ
    ===================================================== */
 
-POS.ordersChangeQty = async function(
+POS.ordersChangeQty = function(
   menuId,
   change
 ){
@@ -1359,146 +1385,157 @@ POS.ordersChangeQty = async function(
   const table =
     Number(POS.currentTable);
 
-  if(!table){
-    return;
-  }
+  const items =
+    POS.tableOrders?.[table] || [];
 
-  // =================================================
-  // DATABASE = SOURCE OF TRUTH
-  // ก่อนแก้จำนวน ต้องโหลด Order ล่าสุดจาก Database
-  // ป้องกัน Order ID เก่าจากเครื่องอื่น / Local Storage
-  // =================================================
-
-  if(POS.__ordersQtyUpdating){
-    return;
-  }
-
-  POS.__ordersQtyUpdating = true;
-
-  try{
-
-    const loaded =
-      await POS.ordersLoadDatabase();
-
-    if(!loaded){
-
-      throw new Error(
-        "โหลดข้อมูลจาก Database ไม่สำเร็จ"
-      );
-
-    }
-
-    // -----------------------------------------------
-    // หลังโหลด Database ใหม่ ต้องหา item ใหม่อีกครั้ง
-    // ห้ามใช้ object เดิมจาก Local Storage
-    // -----------------------------------------------
-
-    const items =
-      POS.tableOrders?.[table] || [];
-
-    const item =
-      items.find(item =>
-        String(item.id) ===
-        String(menuId)
-      );
-
-    if(!item){
-
-      throw new Error(
-        "ไม่พบรายการนี้ใน Database"
-      );
-
-    }
-
-    if(!item.orderId){
-
-      throw new Error(
-        "ไม่พบ Order ID ของรายการนี้"
-      );
-
-    }
-
-    const newQty =
-      Number(item.qty) +
-      Number(change);
-
-    if(newQty < 1){
-      return;
-    }
-
-    // -----------------------------------------------
-    // ใช้ Order ID ล่าสุดจาก Database
-    // -----------------------------------------------
-
-    const result =
-      await POS.api.orderUpdateQty(
-        item.orderId,
-        newQty
-      );
-
-    if(
-      !result ||
-      result.success !== true
-    ){
-
-      throw new Error(
-        result?.error ||
-        "แก้จำนวนไม่สำเร็จ"
-      );
-
-    }
-
-    // -----------------------------------------------
-    // Backend สำเร็จ
-    // อัปเดตข้อมูลที่ได้จาก Database
-    // -----------------------------------------------
-
-    item.qty =
-      Number(
-        result.order?.qty ??
-        newQty
-      );
-
-    item.price =
-      Number(
-        result.order?.unit_price ??
-        item.price ??
-        0
-      );
-
-    POS.tableOrders[table] =
-      items;
-
-    POS.ordersSaveStorage();
-
-    POS.ordersRenderCart();
-
-    POS.ordersRenderTables();
-
-  }catch(error){
-
-    console.error(
-      "ORDER QTY UPDATE ERROR:",
-      error
+  const item =
+    items.find(item =>
+      String(item.id) ===
+      String(menuId)
     );
+
+  if(!item){
+    return;
+  }
+
+  if(!item.orderId){
 
     alert(
-      "แก้จำนวนไม่สำเร็จ\n\n" +
-      (
-        error?.message ||
-        "กรุณาลองใหม่อีกครั้ง"
-      )
+      "ไม่พบ Order ID ของรายการนี้"
     );
 
-  }finally{
-
-    POS.__ordersQtyUpdating =
-      false;
-
+    return;
   }
+
+  const currentQty =
+    Number(item.qty || 0);
+
+  const newQty =
+    currentQty +
+    Number(change);
+
+  if(newQty < 1){
+    return;
+  }
+
+  // =================================================
+  // UI เปลี่ยนทันที ไม่ต้องรอ Server
+  // =================================================
+
+  item.qty =
+    newQty;
+
+  POS.tableOrders[table] =
+    items;
+
+  POS.ordersSaveStorage();
+
+  POS.ordersRenderCart();
+
+  POS.ordersRenderTables();
+
+
+  // =================================================
+  // ส่ง Database แบบ Queue
+  // รองรับการกด + / - รัว ๆ
+  // =================================================
+
+  if(!item.__qtyQueue){
+    item.__qtyQueue =
+      Promise.resolve();
+  }
+
+  item.__qtyQueue =
+    item.__qtyQueue
+      .then(
+        async () => {
+
+          const result =
+            await POS.api.orderUpdateQty(
+              item.orderId,
+              Number(item.qty)
+            );
+
+          if(
+            !result ||
+            result.success !== true
+          ){
+
+            throw new Error(
+              result?.error ||
+              "แก้จำนวนไม่สำเร็จ"
+            );
+
+          }
+
+          item.qty =
+            Number(
+              result.order?.qty ??
+              item.qty
+            );
+
+          item.price =
+            Number(
+              result.order?.unit_price ??
+              item.price ??
+              0
+            );
+
+          POS.tableOrders[table] =
+            items;
+
+          POS.ordersSaveStorage();
+
+          POS.ordersRenderCart();
+
+          POS.ordersRenderTables();
+
+        }
+      )
+      .catch(
+        async error => {
+
+          console.error(
+            "ORDER QTY UPDATE ERROR:",
+            error
+          );
+
+          try{
+
+            POS.__ordersDatabaseLoading =
+              null;
+
+            await POS.ordersLoadDatabase();
+
+            POS.ordersRenderCart();
+
+            POS.ordersRenderTables();
+
+          }catch(reloadError){
+
+            console.error(
+              "ORDER QTY ROLLBACK ERROR:",
+              reloadError
+            );
+
+          }
+
+          alert(
+            "แก้จำนวนไม่สำเร็จ\n\n" +
+            (
+              error?.message ||
+              "กรุณาลองใหม่อีกครั้ง"
+            )
+          );
+
+        }
+      );
 
 };
 
+/* =====================================================
+   ลบสินค้าออกจากโต๊ะ
+   ===================================================== */
 
 POS.ordersDeleteItem = function(menuId){
 
