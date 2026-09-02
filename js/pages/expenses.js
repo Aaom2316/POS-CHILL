@@ -1104,6 +1104,126 @@ POS.selectExpenseStatus =
   };
 
 // =================================================
+// EXPENSES TAB
+// =================================================
+
+POS.expensesSwitchTab = function(tabName){
+
+  const regularTab =
+    document.querySelector(
+      '.pos-expenses-tab[data-expense-tab="regular"]'
+    );
+
+  const shopTab =
+    document.querySelector(
+      '.pos-expenses-tab[data-expense-tab="shop"]'
+    );
+
+
+  const regularArea =
+    document.getElementById(
+      "expensesRegularArea"
+    );
+
+
+  const shopArea =
+    document.getElementById(
+      "expensesShopArea"
+    );
+
+
+  // =================================================
+  // รายจ่ายประจำวัน
+  // =================================================
+
+  if(tabName === "regular"){
+
+    if(regularTab){
+
+      regularTab.classList.add(
+        "active"
+      );
+
+    }
+
+
+    if(shopTab){
+
+      shopTab.classList.remove(
+        "active"
+      );
+
+    }
+
+
+    if(regularArea){
+
+      regularArea.style.display =
+        "block";
+
+    }
+
+
+    if(shopArea){
+
+      shopArea.style.display =
+        "none";
+
+    }
+
+
+    return;
+
+  }
+
+
+  // =================================================
+  // รายจ่ายร้าน
+  // =================================================
+
+  if(tabName === "shop"){
+
+    if(regularTab){
+
+      regularTab.classList.remove(
+        "active"
+      );
+
+    }
+
+
+    if(shopTab){
+
+      shopTab.classList.add(
+        "active"
+      );
+
+    }
+
+
+    if(regularArea){
+
+      regularArea.style.display =
+        "none";
+
+    }
+
+
+    if(shopArea){
+
+      shopArea.style.display =
+        "block";
+
+    }
+
+
+    return;
+
+  }
+
+};
+
+// =================================================
 // SAVE EXPENSE
 // =================================================
 
@@ -1582,10 +1702,11 @@ POS.renderExpenses = function(type){
 
       if(type === "shop"){
 
-        return
+        return (
           itemType === "BUSINESS_EXPENSE" ||
           itemType === "SHOP" ||
-          itemType === "SHOP_EXPENSE";
+          itemType === "SHOP_EXPENSE"
+        );
 
       }
 
@@ -1593,10 +1714,11 @@ POS.renderExpenses = function(type){
       // ถ้าไม่ได้ระบุว่าเป็นรายจ่ายร้าน
       // ให้ถือเป็นรายจ่ายประจำวัน
       // เพื่อรองรับข้อมูลในฐานข้อมูลที่ใช้ชื่อประเภทต่างกัน
-      return
+      return (
         itemType !== "BUSINESS_EXPENSE" &&
         itemType !== "SHOP" &&
-        itemType !== "SHOP_EXPENSE";
+        itemType !== "SHOP_EXPENSE"
+      );
 
     });
 
