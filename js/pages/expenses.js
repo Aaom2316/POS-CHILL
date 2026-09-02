@@ -1617,12 +1617,39 @@ POS.renderExpenses = function(type){
       : "CASH_EXPENSE";
 
 
+  // =================================================
+  // FILTER
+  // รองรับข้อมูลเก่าที่อาจใช้ regular / shop
+  // หรือยังไม่มี expense_type
+  // =================================================
+
   const list =
-    expenses.filter(
-      item =>
-        item.expense_type ===
-        expenseType
-    );
+    expenses.filter(item => {
+
+      const itemType =
+        String(
+          item?.expense_type ||
+          ""
+        )
+          .trim()
+          .toUpperCase();
+
+      if(type === "shop"){
+
+        return
+          itemType === "BUSINESS_EXPENSE" ||
+          itemType === "SHOP";
+
+      }
+
+      // รายจ่ายประจำวัน
+      // รองรับข้อมูลเดิมที่ยังไม่มี expense_type
+      return
+        itemType === "CASH_EXPENSE" ||
+        itemType === "REGULAR" ||
+        itemType === "";
+
+    });
 
 
   // =================================================
@@ -2051,7 +2078,9 @@ POS.expensesSwitchTab = function(tabName){
     }
 
 
-    POS.loadExpenses();
+    POS.renderExpenses(
+      "regular"
+    );
 
 
     return;
@@ -2103,7 +2132,9 @@ POS.expensesSwitchTab = function(tabName){
     }
 
 
-    POS.loadExpenses();
+    POS.renderExpenses(
+      "shop"
+    );
 
   }
 
