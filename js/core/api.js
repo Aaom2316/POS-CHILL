@@ -630,88 +630,17 @@ POS.api = {
   // EXPENSES LIST
   // =================================================
 
-  async expensesList() {
+  expensesList() {
 
-    // =================================================
-    // EXPENSES LIST
-    // อ่านจาก Database กลางโดยตรง
-    // ใช้ publishable key + RLS ของผู้ใช้ปัจจุบัน
-    // =================================================
-
-    try{
-
-      const result =
-        await POS.supabase
-          .from("expenses")
-          .select("*")
-          .order(
-            "expense_date",
-            {
-              ascending:false
-            }
-          )
-          .order(
-            "created_at",
-            {
-              ascending:false
-            }
-          );
-
-      if(result.error){
-
-        console.error(
-          "EXPENSES DIRECT DATABASE ERROR:",
-          result.error
-        );
-
-        throw new Error(
-          result.error.message ||
-          "โหลดรายการรายจ่ายไม่สำเร็จ"
-        );
-
+    return this.call(
+      POS_CONFIG.FUNCTION_NAMES.EXPENSES,
+      {
+        method:"POST",
+        body:{
+          action:"LIST"
+        }
       }
-
-      const expenses =
-        Array.isArray(result.data)
-          ? result.data
-          : [];
-
-      console.log(
-        "EXPENSES DIRECT DATABASE",
-        {
-          count:
-            expenses.length
-        }
-      );
-
-      return {
-        success:true,
-        stage:"DATABASE",
-        source:"DIRECT_CLIENT_DATABASE",
-        count:expenses.length,
-        expenses:expenses
-      };
-
-    }catch(error){
-
-      console.error(
-        "EXPENSES DIRECT DATABASE LOAD ERROR:",
-        error
-      );
-
-      // ถ้าอ่านตรงจาก Database ไม่ได้
-      // ค่อยใช้ Edge Function เดิมเป็น fallback
-      return this.call(
-        POS_CONFIG.FUNCTION_NAMES.EXPENSES,
-        {
-          method:"POST",
-          body:{
-            action:"LIST"
-          }
-        }
-      );
-
-    }
+    );
 
   },
 
