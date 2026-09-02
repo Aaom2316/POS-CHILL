@@ -2051,9 +2051,7 @@ POS.expensesSwitchTab = function(tabName){
     }
 
 
-    POS.renderExpenses(
-      "regular"
-    );
+    POS.loadExpenses();
 
 
     return;
@@ -2105,9 +2103,7 @@ POS.expensesSwitchTab = function(tabName){
     }
 
 
-    POS.renderExpenses(
-      "shop"
-    );
+    POS.loadExpenses();
 
   }
 
