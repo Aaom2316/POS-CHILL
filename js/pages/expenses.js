@@ -1486,6 +1486,68 @@ POS.loadExpenses = async function(){
 
   try{
 
+    // =================================================
+    // STEP 010 : รอพื้นที่รายการให้เข้า DOM ก่อน
+    // ป้องกันโหลดข้อมูลเร็วเกินไปจน render ไม่ลงหน้า
+    // =================================================
+
+    let regularArea = null;
+    let shopArea = null;
+
+    for(
+      let attempt = 0;
+      attempt < 20;
+      attempt++
+    ){
+
+      regularArea =
+        document.getElementById(
+          "expensesRegularArea"
+        );
+
+      shopArea =
+        document.getElementById(
+          "expensesShopArea"
+        );
+
+
+      if(
+        regularArea ||
+        shopArea
+      ){
+
+        break;
+
+      }
+
+
+      await new Promise(
+        resolve =>
+          setTimeout(
+            resolve,
+            50
+          )
+      );
+
+    }
+
+
+    if(
+      !regularArea &&
+      !shopArea
+    ){
+
+      throw new Error(
+        "EXPENSES_AREA_NOT_READY"
+      );
+
+    }
+
+
+    // =================================================
+    // LOAD FROM DATABASE
+    // =================================================
+
     const result =
       await POS.api.expensesList();
 
@@ -1503,17 +1565,32 @@ POS.loadExpenses = async function(){
     }
 
 
-    const expenses =
-      result.expenses || [];
-
-
-    // เก็บไว้ใช้ตอนเปลี่ยนแท็บ
+    // =================================================
+    // เก็บข้อมูลกลาง
+    // =================================================
 
     POS.expensesList =
-      expenses;
+      Array.isArray(
+        result.expenses
+      )
+        ? result.expenses
+        : [];
 
 
-    // แสดงแท็บปัจจุบัน
+    // =================================================
+    // สำคัญ
+    // Render ทั้ง 2 แท็บ
+    // แล้วค่อยแสดงแท็บปัจจุบัน
+    // =================================================
+
+    POS.renderExpenses(
+      "regular"
+    );
+
+    POS.renderExpenses(
+      "shop"
+    );
+
 
     const currentType =
       POS.currentExpenseType === "shop"
@@ -1521,7 +1598,7 @@ POS.loadExpenses = async function(){
         : "regular";
 
 
-    POS.renderExpenses(
+    POS.expensesSwitchTab(
       currentType
     );
 
