@@ -1549,7 +1549,7 @@ POS.ordersChangeQty = function(
    ลบสินค้าออกจากโต๊ะ
    ===================================================== */
 
-POS.ordersDeleteItem = function(menuId){
+POS.ordersDeleteItem = async function(menuId){
 
   const table =
     Number(POS.currentTable);
@@ -1557,27 +1557,104 @@ POS.ordersDeleteItem = function(menuId){
   const items =
     POS.tableOrders?.[table] || [];
 
-
   const index =
     items.findIndex(item =>
       String(item.id) === String(menuId)
     );
 
-
   if(index === -1){
     return;
   }
 
+  const item = items[index];
 
+  if(!item.orderId){
+    alert("ไม่พบ Order ID ของรายการนี้");
+    return;
+  }
+
+  if(item.__deleting){
+    return;
+  }
+
+  item.__deleting = true;
+
+  // ลบจากหน้าจอก่อน เพื่อให้กดแล้วหายทันที
   items.splice(index, 1);
-
-
-  POS.tableOrders[table] =
-    items;
-
+  POS.tableOrders[table] = items;
   POS.ordersSaveStorage();
-
   POS.ordersRenderCart();
+  POS.ordersRenderTables();
+
+  try{
+
+    const result =
+      await POS.api.call(
+        POS_CONFIG.FUNCTION_NAMES.ORDERS,
+        {
+          method: "POST",
+          body: {
+            action: "DELETE",
+            order_id: item.orderId
+          }
+        }
+      );
+
+    if(!result || result.success !== true){
+      throw new Error(
+        result?.error ||
+        "ลบรายการไม่สำเร็จ"
+      );
+    }
+
+    // ถ้าโต๊ะว่างแล้ว ให้บิลเก่าหมดอายุ
+    if(
+      !POS.tableOrders[table]?.length &&
+      POS.tableBillIds
+    ){
+      delete POS.tableBillIds[table];
+    }
+
+    POS.ordersSaveStorage();
+    POS.ordersRenderCart();
+    POS.ordersRenderTables();
+
+    console.log(
+      "ORDER DELETE SUCCESS:",
+      result
+    );
+
+  }catch(error){
+
+    console.error(
+      "ORDER DELETE ERROR:",
+      error
+    );
+
+    // ถ้าฐานข้อมูลลบไม่สำเร็จ ให้โหลดข้อมูลจริงกลับมา
+    try{
+      POS.__ordersDatabaseLoading = null;
+      await POS.ordersLoadDatabase(true);
+      POS.ordersRenderCart();
+      POS.ordersRenderTables();
+    }catch(loadError){
+      console.error(
+        "ORDER DELETE RESTORE ERROR:",
+        loadError
+      );
+    }
+
+    alert(
+      "ลบรายการไม่สำเร็จ\n\n" +
+      (
+        error?.message ||
+        "กรุณาลองใหม่อีกครั้ง"
+      )
+    );
+
+  }finally{
+    item.__deleting = false;
+  }
 
 };
 
