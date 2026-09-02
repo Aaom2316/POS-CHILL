@@ -1359,43 +1359,76 @@ POS.ordersChangeQty = async function(
   const table =
     Number(POS.currentTable);
 
-  const items =
-    POS.tableOrders?.[table] || [];
-
-  const item =
-    items.find(item =>
-      String(item.id) ===
-      String(menuId)
-    );
-
-  if(!item){
+  if(!table){
     return;
   }
 
-  if(!item.orderId){
+  // =================================================
+  // DATABASE = SOURCE OF TRUTH
+  // ก่อนแก้จำนวน ต้องโหลด Order ล่าสุดจาก Database
+  // ป้องกัน Order ID เก่าจากเครื่องอื่น / Local Storage
+  // =================================================
 
-    alert(
-      "ไม่พบ Order ID ของรายการนี้"
-    );
-
+  if(POS.__ordersQtyUpdating){
     return;
   }
 
-  const newQty =
-    Number(item.qty) +
-    Number(change);
-
-  if(newQty < 1){
-    return;
-  }
-
-  if(item.__updating){
-    return;
-  }
-
-  item.__updating = true;
+  POS.__ordersQtyUpdating = true;
 
   try{
+
+    const loaded =
+      await POS.ordersLoadDatabase();
+
+    if(!loaded){
+
+      throw new Error(
+        "โหลดข้อมูลจาก Database ไม่สำเร็จ"
+      );
+
+    }
+
+    // -----------------------------------------------
+    // หลังโหลด Database ใหม่ ต้องหา item ใหม่อีกครั้ง
+    // ห้ามใช้ object เดิมจาก Local Storage
+    // -----------------------------------------------
+
+    const items =
+      POS.tableOrders?.[table] || [];
+
+    const item =
+      items.find(item =>
+        String(item.id) ===
+        String(menuId)
+      );
+
+    if(!item){
+
+      throw new Error(
+        "ไม่พบรายการนี้ใน Database"
+      );
+
+    }
+
+    if(!item.orderId){
+
+      throw new Error(
+        "ไม่พบ Order ID ของรายการนี้"
+      );
+
+    }
+
+    const newQty =
+      Number(item.qty) +
+      Number(change);
+
+    if(newQty < 1){
+      return;
+    }
+
+    // -----------------------------------------------
+    // ใช้ Order ID ล่าสุดจาก Database
+    // -----------------------------------------------
 
     const result =
       await POS.api.orderUpdateQty(
@@ -1415,16 +1448,21 @@ POS.ordersChangeQty = async function(
 
     }
 
+    // -----------------------------------------------
+    // Backend สำเร็จ
+    // อัปเดตข้อมูลที่ได้จาก Database
+    // -----------------------------------------------
+
     item.qty =
       Number(
-        result.order?.qty ||
+        result.order?.qty ??
         newQty
       );
 
     item.price =
       Number(
-        result.order?.unit_price ||
-        item.price ||
+        result.order?.unit_price ??
+        item.price ??
         0
       );
 
@@ -1454,16 +1492,13 @@ POS.ordersChangeQty = async function(
 
   }finally{
 
-    item.__updating = false;
+    POS.__ordersQtyUpdating =
+      false;
 
   }
 
 };
 
-
-/* =====================================================
-   ลบสินค้าออกจากโต๊ะ
-   ===================================================== */
 
 POS.ordersDeleteItem = function(menuId){
 
