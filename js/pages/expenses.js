@@ -1522,13 +1522,47 @@ POS.loadExpenses = async function(){
       );
     }
 
-    // รองรับทั้ง response แบบตรงและแบบห่อ data
-    const expenses =
-      Array.isArray(result.expenses)
-        ? result.expenses
-        : Array.isArray(result?.data?.expenses)
-          ? result.data.expenses
-          : [];
+    // รองรับ response จาก Edge Function ทุกแบบ
+    // แบบตรง:        { expenses:[...] }
+    // แบบห่อ data:   { data:{ expenses:[...] } }
+    // แบบห่อซ้อน:    { data:{ data:{ expenses:[...] } } }
+    // และกรณี data เป็น array โดยตรง
+    let expenses = [];
+
+    if(Array.isArray(result?.expenses)){
+      expenses = result.expenses;
+    }
+    else if(Array.isArray(result?.data?.expenses)){
+      expenses = result.data.expenses;
+    }
+    else if(Array.isArray(result?.data?.data?.expenses)){
+      expenses = result.data.data.expenses;
+    }
+    else if(Array.isArray(result?.data)){
+      expenses = result.data;
+    }
+    else if(Array.isArray(result?.data?.data)){
+      expenses = result.data.data;
+    }
+
+    // ถ้า Backend แจ้งว่ามีรายการ แต่ frontend หา array ไม่เจอ
+    // ให้ถือว่า response ผิดรูปแบบ ไม่แสดงเป็น 0 รายการหลอก
+    const serverCount =
+      Number(
+        result?.count ??
+        result?.data?.count ??
+        result?.data?.data?.count ??
+        0
+      );
+
+    if(
+      serverCount > 0 &&
+      expenses.length === 0
+    ){
+      throw new Error(
+        "Backend พบรายการรายจ่าย แต่รูปแบบข้อมูลที่ส่งกลับมาไม่ถูกต้อง"
+      );
+    }
 
     POS.expensesList = expenses;
 
