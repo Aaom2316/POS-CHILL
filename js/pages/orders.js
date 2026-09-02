@@ -42,6 +42,180 @@ POS.ordersLoadStorage = function(){
 };
 
 
+/* =====================================================
+   โหลดสถานะโต๊ะจาก DATABASE
+   DATABASE = SOURCE OF TRUTH
+   Local Storage ใช้เป็น cache เท่านั้น
+   ===================================================== */
+
+POS.ordersLoadDatabase = async function(){
+
+  if(POS.__ordersDatabaseLoading){
+    return POS.__ordersDatabaseLoading;
+  }
+
+  POS.__ordersDatabaseLoading = (async function(){
+
+    try{
+
+      const tableOrders = {};
+      const tableBillIds = {};
+
+      [1,2,3,4,5,6].forEach(table => {
+        tableOrders[table] = [];
+      });
+
+
+      // -----------------------------------------------
+      // โหลดเมนู เพื่อแปลง menu_id เป็นข้อมูลที่หน้าเว็บใช้
+      // -----------------------------------------------
+
+      const menuResult =
+        await POS.api.menus();
+
+      const menus =
+        Array.isArray(menuResult?.menus)
+          ? menuResult.menus
+          : [];
+
+      const menuMap = {};
+
+      menus.forEach(menu => {
+        menuMap[String(menu.id)] = menu;
+      });
+
+
+      // -----------------------------------------------
+      // โหลด Orders ของโต๊ะ 1-6 จาก Database พร้อมกัน
+      // -----------------------------------------------
+
+      const results =
+        await Promise.all(
+          [1,2,3,4,5,6].map(async table => {
+
+            const result =
+              await POS.api.call(
+                POS_CONFIG.FUNCTION_NAMES.ORDERS,
+                {
+                  method: "POST",
+                  body: {
+                    action: "LIST",
+                    table_no: table
+                  }
+                }
+              );
+
+            return {
+              table,
+              result
+            };
+
+          })
+        );
+
+
+      // -----------------------------------------------
+      // แปลงข้อมูล Database ให้เป็นรูปแบบเดิมของหน้า Orders
+      // -----------------------------------------------
+
+      results.forEach(({table, result}) => {
+
+        if(!result || result.success !== true){
+          throw new Error(
+            result?.error ||
+            `โหลดข้อมูลโต๊ะ ${table} ไม่สำเร็จ`
+          );
+        }
+
+        const rows =
+          Array.isArray(result.orders)
+            ? result.orders
+            : [];
+
+        tableOrders[table] =
+          rows.map(row => {
+
+            const menu =
+              menuMap[String(row.menu_id)] || {};
+
+            return {
+              orderId: row.id,
+              billId: String(row.remark || "").trim(),
+              id: row.menu_id,
+              sku: menu.sku || "",
+              name: menu.name || "ไม่พบชื่อเมนู",
+              price: Number(
+                row.unit_price ??
+                menu.price ??
+                0
+              ),
+              emoji: menu.emoji || "🍹",
+              qty: Number(row.qty || 0)
+            };
+
+          });
+
+
+        // ---------------------------------------------
+        // จำเลขบิลจาก Database ไว้ใช้ตอนเพิ่ม/รับเงิน
+        // ---------------------------------------------
+
+        const billId =
+          tableOrders[table]
+            .map(item => String(item.billId || "").trim())
+            .find(Boolean);
+
+        if(billId){
+          tableBillIds[table] = billId;
+        }
+
+      });
+
+
+      // -----------------------------------------------
+      // Database เป็นข้อมูลหลัก
+      // -----------------------------------------------
+
+      POS.tableOrders = tableOrders;
+      POS.tableBillIds = tableBillIds;
+
+
+      // Local Storage เป็น cache หลังโหลด Database สำเร็จเท่านั้น
+      POS.ordersSaveStorage();
+
+      POS.__ordersDatabaseLoaded = true;
+
+      console.log(
+        "ORDERS DATABASE LOADED:",
+        POS.tableOrders
+      );
+
+      return true;
+
+    }catch(error){
+
+      console.error(
+        "LOAD ORDERS DATABASE ERROR:",
+        error
+      );
+
+      // Database โหลดไม่ได้ -> ใช้ Local cache ต่อชั่วคราว
+      // และไม่ล้างข้อมูลเดิม
+      return false;
+
+    }finally{
+
+      POS.__ordersDatabaseLoading = null;
+
+    }
+
+  })();
+
+  return POS.__ordersDatabaseLoading;
+
+};
+
+
 POS.ordersSaveStorage = function(){
 
   try{
@@ -194,7 +368,7 @@ POS.ordersRenderTables = function(){
    เปิดรายละเอียดโต๊ะ
    ===================================================== */
 
-POS.ordersOpenTable = function(table){
+POS.ordersOpenTable = async function(table){
 
   const tableArea =
     document.getElementById("ordersTableArea");
@@ -217,6 +391,20 @@ POS.ordersOpenTable = function(table){
   tableArea.style.display = "none";
 
   detailArea.style.display = "block";
+
+  // -----------------------------------------------
+  // เปิดโต๊ะ -> อ่าน Database ล่าสุดอีกครั้ง
+  // เพื่อให้ทุกเครื่องเห็นข้อมูลชุดเดียวกัน
+  // -----------------------------------------------
+
+  const loaded =
+    await POS.ordersLoadDatabase();
+
+  if(!loaded){
+    console.warn(
+      "ใช้ Local Storage ชั่วคราว เพราะโหลด Database ไม่สำเร็จ"
+    );
+  }
 
   POS.ordersRenderCart();
 
@@ -2093,7 +2281,11 @@ POS.ordersBackFromMenu = function(){
 
 POS.pages.orders = async function(){
 
+  // Local Storage ใช้เป็น cache เท่านั้น
   POS.ordersLoadStorage();
+
+  // โหลดข้อมูลจริงจาก Database ก่อนแสดงหน้าโต๊ะ
+  await POS.ordersLoadDatabase();
 
   return `
 
