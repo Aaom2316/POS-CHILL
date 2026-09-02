@@ -2153,6 +2153,9 @@ POS.expensesSwitchTab = function(tabName){
       "regular"
     );
 
+    // ดึงข้อมูลล่าสุดจาก DATABASE ทุกครั้งที่สลับแท็บ
+    POS.loadExpenses();
+
 
     return;
 
@@ -2206,6 +2209,8 @@ POS.expensesSwitchTab = function(tabName){
     POS.renderExpenses(
       "shop"
     );
+    // ดึงข้อมูลล่าสุดจาก DATABASE ทุกครั้งที่สลับแท็บ
+    POS.loadExpenses();
 
   }
 
