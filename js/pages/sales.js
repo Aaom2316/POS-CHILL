@@ -1813,7 +1813,7 @@ const monthSalesRows = [
   // ===================================================
 
   const dailyNetCash =
-    todayCash -
+    cashDisplayTotal -
     todayRegularExpenseTotal;
 
 
@@ -2886,7 +2886,7 @@ const monthSalesRows = [
                     onclick="POS.openDailyClosingModal({
                       businessDate: '${today}',
                       salesTotal: ${todaySales},
-                      cashReceived: ${todayCash},
+                      cashReceived: ${cashDisplayTotal},
                       regularExpense: ${todayRegularExpenseTotal}
                     })" 
                   >
@@ -2935,7 +2935,7 @@ const monthSalesRows = [
             "
           >
             ${money(
-              todayCash
+              cashDisplayTotal
             )}
             บาท
           </div>
