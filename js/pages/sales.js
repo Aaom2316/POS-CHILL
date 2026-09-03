@@ -1180,6 +1180,98 @@ let todayCash =
 
 
 // ===================================================
+// CASH DISPLAY DATE
+// ===================================================
+// ก่อนปิดยอดของวันปัจจุบัน
+// ให้ช่อง "รับเงินจริงวันนี้" แสดงยอดของวันก่อนหน้า
+// เช่น วันนี้ 03/09 และยังไม่ปิดยอด -> แสดง 02/09
+// หลังปิดยอดแล้ว -> กลับมาแสดงยอดของวันปัจจุบัน
+// ===================================================
+
+let cashDisplayDate =
+  String(today).substring(0,10);
+
+if(!dailyClosedAt && !businessDateIsFuture){
+
+  const previousDate =
+    new Date(
+      String(today) + "T00:00:00+07:00"
+    );
+
+  previousDate.setDate(
+    previousDate.getDate() - 1
+  );
+
+  cashDisplayDate =
+    previousDate.toLocaleDateString(
+      "en-CA",
+      {
+        timeZone:"Asia/Bangkok"
+      }
+    );
+
+}
+
+
+const cashDisplayRows =
+  [
+    ...salesRows,
+    ...orderRows
+  ].filter(
+    row => {
+
+      const status =
+        String(
+          row.payment_status ||
+          ""
+        ).toUpperCase();
+
+      if(status !== "PAID"){
+        return false;
+      }
+
+      const paidAt =
+        row.paid_at ||
+        "";
+
+      if(!paidAt){
+        return false;
+      }
+
+      return (
+        getDateKey(paidAt) ===
+        cashDisplayDate
+      );
+
+    }
+  );
+
+
+let cashDisplayTotal =
+  cashDisplayRows.reduce(
+    (sum,row) =>
+      sum +
+        Number(
+          row.total || 0
+        ),
+    0
+  );
+
+
+if(businessDateIsFuture){
+
+  cashDisplayTotal = 0;
+
+}
+
+
+const cashDisplayCount =
+  businessDateIsFuture
+    ? 0
+    : cashDisplayRows.length;
+
+
+// ===================================================
 // ถ้าปิดยอดแล้ว และวันทำการเป็นวันถัดไป
 // รับเงินจริงวันนี้ต้องเริ่มที่ 0
 // ===================================================
@@ -2640,9 +2732,7 @@ const monthSalesRows = [
             "
           >
             ${money(
-            businessDateIsFuture
-              ? 0
-              : todayCash
+            cashDisplayTotal
           )}
           บาท
           </div>
@@ -2654,9 +2744,7 @@ const monthSalesRows = [
             "
           >
             ${
-              businessDateIsFuture
-                ? 0
-                : paidRows.length
+              cashDisplayCount
             }
             รายการที่ชำระแล้ว
           </div>
