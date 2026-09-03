@@ -1191,6 +1191,17 @@ let todayCash =
 let cashDisplayDate =
   String(today).substring(0,10);
 
+// ก่อนปิดยอดของ BUSINESS_DATE ปัจจุบัน
+// ให้แสดงยอดรับเงินจริงของวันก่อนหน้า
+//
+// แต่ถ้า BUSINESS_DATE ถูกเลื่อนไปวันใหม่แล้ว
+// (เช่น ปิด 02/09 สำเร็จ -> BUSINESS_DATE = 03/09)
+// ต้องแสดงยอดของวันที่ปัจจุบันทันที
+//
+// ใช้ dailyClosedAt ของ "วันนี้" ไม่ได้เพียงอย่างเดียว
+// เพราะหลังปิดยอดแล้ว close_date จะเป็นวันก่อนหน้า
+// จึงตรวจว่ามี daily closing ของวันก่อนหน้าหรือไม่
+
 if(!dailyClosedAt && !businessDateIsFuture){
 
   const previousDate =
@@ -1202,13 +1213,54 @@ if(!dailyClosedAt && !businessDateIsFuture){
     previousDate.getDate() - 1
   );
 
-  cashDisplayDate =
+  const previousDateKey =
     previousDate.toLocaleDateString(
       "en-CA",
       {
         timeZone:"Asia/Bangkok"
       }
     );
+
+  let previousDayClosed = false;
+
+  try{
+
+    const previousClosingResult =
+      await POS.supabase
+        .from("daily_closings")
+        .select("id,close_date,closed_at")
+        .eq(
+          "close_date",
+          previousDateKey
+        )
+        .order(
+          "closed_at",
+          {
+            ascending:false
+          }
+        )
+        .limit(1)
+        .maybeSingle();
+
+    previousDayClosed =
+      !previousClosingResult.error &&
+      !!previousClosingResult.data?.closed_at;
+
+  }catch(error){
+
+    console.warn(
+      "LOAD PREVIOUS DAILY CLOSING ERROR:",
+      error
+    );
+
+  }
+
+  if(!previousDayClosed){
+
+    cashDisplayDate =
+      previousDateKey;
+
+  }
 
 }
 
