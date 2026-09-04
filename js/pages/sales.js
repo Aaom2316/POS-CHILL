@@ -2438,6 +2438,64 @@ const monthSalesRows = [
         padding:20px 0 15px;
       }
 
+      /* =====================================================
+         HISTORY ROUND FILTER
+         ===================================================== */
+
+      .pos-sales-history-filter{
+        display:flex;
+        gap:10px;
+        margin:0 0 20px;
+        padding:6px;
+        width:fit-content;
+        background:#f1f5f9;
+        border-radius:16px;
+      }
+
+      .pos-sales-history-filter-btn{
+        border:none;
+        border-radius:12px;
+        padding:11px 20px;
+        background:transparent;
+        color:#64748b;
+        font-family:inherit;
+        font-size:15px;
+        font-weight:800;
+        cursor:pointer;
+        transition:.2s;
+        white-space:nowrap;
+      }
+
+      .pos-sales-history-filter-btn:hover{
+        background:#e2e8f0;
+        color:#334155;
+      }
+
+      .pos-sales-history-filter-btn.active{
+        background:#ffffff;
+        color:#2563eb;
+        box-shadow:0 4px 12px rgba(15,23,42,.08);
+      }
+
+      .pos-sales-history-round-info{
+        margin:-6px 0 18px;
+        color:#94a3b8;
+        font-size:14px;
+        font-weight:600;
+      }
+
+      @media(max-width:700px){
+        .pos-sales-history-filter{
+          width:100%;
+        }
+
+        .pos-sales-history-filter-btn{
+          flex:1;
+          padding:11px 10px;
+          font-size:14px;
+        }
+      }
+
       .pos-sales-history-table-wrap{
         width:100%;
         overflow-x:auto;
@@ -2501,6 +2559,166 @@ const monthSalesRows = [
         .pos-sales-tab{flex:1;padding:11px 12px;font-size:14px;}
         .pos-sales-history{padding-left:15px;padding-right:15px;}
       }
+
+
+      /* =====================================================
+          DAILY CLOSING SUMMARY CARDS
+          ===================================================== */
+
+        .pos-sales-closing-summary{
+          width:100%;
+          display:grid;
+          grid-template-columns:
+            repeat(3,minmax(0,1fr));
+          gap:14px;
+          margin:0 0 18px;
+        }
+
+        .pos-sales-closing-card{
+          background:#ffffff;
+          border-radius:14px;
+          padding:14px 20px;
+          min-height:82px;
+          box-sizing:border-box;
+          box-shadow:
+            0 4px 14px rgba(0,0,0,.06);
+          border-top:3px solid;
+          display:flex;
+          flex-direction:column;
+          align-items:center;
+          justify-content:center;
+          text-align:center;
+        }
+
+
+        /* =====================================================
+          เงินขาดสะสม
+          ===================================================== */
+
+        .pos-sales-closing-card.short{
+          border-top-color:#ef4444;
+        }
+
+        .pos-sales-closing-card.short
+        .pos-sales-closing-card-value{
+          color:#dc2626;
+        }
+
+
+        /* =====================================================
+          เงินเกินสะสม
+          ===================================================== */
+
+        .pos-sales-closing-card.over{
+          border-top-color:#f59e0b;
+        }
+
+        .pos-sales-closing-card.over
+        .pos-sales-closing-card-value{
+          color:#ea580c;
+        }
+
+
+        /* =====================================================
+          ส่วนต่างสุทธิ
+          ===================================================== */
+
+        /* ติดลบ = แดง */
+
+        .pos-sales-closing-card.net.short{
+          border-top-color:#ef4444;
+        }
+
+        .pos-sales-closing-card.net.short
+        .pos-sales-closing-card-value{
+          color:#dc2626;
+        }
+
+
+        /* มากกว่า 0 = ส้ม */
+
+        .pos-sales-closing-card.net.over{
+          border-top-color:#f59e0b;
+        }
+
+        .pos-sales-closing-card.net.over
+        .pos-sales-closing-card-value{
+          color:#ea580c;
+        }
+
+
+        /* เท่ากับ 0 = เขียว */
+
+        .pos-sales-closing-card.net.equal{
+          border-top-color:#22c55e;
+        }
+
+        .pos-sales-closing-card.net.equal
+        .pos-sales-closing-card-value{
+          color:#16a34a;
+        }
+
+
+        /* =====================================================
+          DOT
+          ===================================================== */
+
+        .pos-sales-closing-dot{
+          width:13px;
+          height:13px;
+          border-radius:50%;
+          display:inline-block;
+        }
+
+        .pos-sales-closing-dot.short{
+          background:#ef4444;
+        }
+
+        .pos-sales-closing-dot.over{
+          background:#f97316;
+        }
+
+        .pos-sales-closing-dot.equal{
+          background:#4ade80;
+        }
+
+
+        /* =====================================================
+          TITLE / VALUE
+          ===================================================== */
+
+        .pos-sales-closing-card-title{
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          gap:7px;
+          font-size:14px;
+          font-weight:800;
+          color:#334155;
+          margin-bottom:5px;
+        }
+
+        .pos-sales-closing-card-value{
+          font-size:20px;
+          line-height:1.1;
+          font-weight:900;
+        }
+
+
+        /* =====================================================
+          MOBILE
+          ===================================================== */
+
+        @media(max-width:900px){
+
+          .pos-sales-closing-summary{
+            grid-template-columns:1fr;
+          }
+
+        }
+
+
+
     </style>
 
 
@@ -3214,6 +3432,32 @@ const monthSalesRows = [
           </div>
 
           <div
+            class="pos-sales-history-filter"
+            role="tablist"
+            aria-label="ตัวกรองประวัติปิดยอด"
+          >
+
+            <button
+              type="button"
+              id="posClosingCurrentButton"
+              class="pos-sales-history-filter-btn active"
+              onclick="POS.loadDailyClosingHistory('current')"
+            >
+              🔵 รอบปัจจุบัน
+            </button>
+
+            <button
+              type="button"
+              id="posClosingAllButton"
+              class="pos-sales-history-filter-btn"
+              onclick="POS.loadDailyClosingHistory('all')"
+            >
+              📋 ดูทั้งหมด
+            </button>
+
+          </div>
+
+          <div
             id="posSalesHistoryContent"
             class="pos-sales-history-loading"
           >
@@ -3275,7 +3519,7 @@ POS.salesTab = async function(tab){
 // LOAD DAILY CLOSING HISTORY
 // =====================================================
 
-POS.loadDailyClosingHistory = async function(){
+POS.loadDailyClosingHistory = async function(mode = "current"){
 
   const content =
     document.getElementById(
@@ -3286,6 +3530,31 @@ POS.loadDailyClosingHistory = async function(){
     return;
   }
 
+  const currentButton =
+    document.getElementById(
+      "posClosingCurrentButton"
+    );
+
+  const allButton =
+    document.getElementById(
+      "posClosingAllButton"
+    );
+
+  const currentMode =
+    mode === "all"
+      ? "all"
+      : "current";
+
+  currentButton?.classList.toggle(
+    "active",
+    currentMode === "current"
+  );
+
+  allButton?.classList.toggle(
+    "active",
+    currentMode === "all"
+  );
+
   content.className =
     "pos-sales-history-loading";
 
@@ -3294,7 +3563,6 @@ POS.loadDailyClosingHistory = async function(){
 
 
   try{
-
     // =================================================
     // ใช้ SYSTEM API
     // ห้ามอ่าน daily_closings / users ตรงจาก Frontend
@@ -3305,7 +3573,6 @@ POS.loadDailyClosingHistory = async function(){
         POS_CONFIG.FUNCTION_NAMES.SYSTEM,
         {
           method:"POST",
-
           body:{
             action:
               "GET_DAILY_CLOSING_HISTORY"
@@ -3327,12 +3594,128 @@ POS.loadDailyClosingHistory = async function(){
     }
 
 
-    const rows =
+    let rows =
       Array.isArray(
         result.closings
       )
         ? result.closings
         : [];
+
+
+    // =================================================
+    // รอบปัจจุบัน
+    // ใช้ started_at ของ CASH ROUND เป็นตัวแบ่งรอบ
+    // ไม่แตะข้อมูล / ไม่เปลี่ยนระบบปิดยอด
+    // =================================================
+
+    let currentCashRound = null;
+
+    if(currentMode === "current"){
+
+      try{
+
+        const roundResult =
+          await POS.api.cashRoundCurrent();
+
+        if(roundResult){
+
+          if(
+            roundResult.success === true &&
+            roundResult.round
+          ){
+
+            currentCashRound =
+              roundResult.round;
+
+          }
+          else if(
+            roundResult.round_no !== undefined &&
+            roundResult.started_at
+          ){
+
+            currentCashRound =
+              roundResult;
+
+          }
+          else if(
+            roundResult.data &&
+            roundResult.data.round_no !== undefined
+          ){
+
+            currentCashRound =
+              roundResult.data;
+
+          }
+
+        }
+
+      }catch(roundError){
+
+        console.warn(
+          "LOAD CURRENT CASH ROUND FOR HISTORY ERROR:",
+          roundError
+        );
+
+      }
+
+
+      const roundStartAt =
+        currentCashRound?.started_at
+          ? new Date(
+              currentCashRound.started_at
+            )
+          : null;
+
+
+      if(
+        !roundStartAt ||
+        isNaN(
+          roundStartAt.getTime()
+        )
+      ){
+
+        rows = [];
+
+      }else{
+
+        rows =
+          rows.filter(
+            row => {
+
+              const closedAt =
+                row?.closed_at ||
+                null;
+
+              if(!closedAt){
+                return false;
+              }
+
+              const closeDate =
+                new Date(
+                  closedAt
+                );
+
+              if(
+                isNaN(
+                  closeDate.getTime()
+                )
+              ){
+
+                return false;
+
+              }
+
+              return (
+                closeDate.getTime() >=
+                roundStartAt.getTime()
+              );
+
+            }
+          );
+
+      }
+
+    }
 
 
     if(!rows.length){
@@ -3341,11 +3724,161 @@ POS.loadDailyClosingHistory = async function(){
         "pos-sales-history-empty";
 
       content.innerHTML =
-        "ยังไม่มีประวัติการปิดยอด";
+        currentMode === "current"
+          ? `
+              <div>
+                ยังไม่มีประวัติปิดยอดในรอบปัจจุบัน
+              </div>
+              ${
+                currentCashRound?.started_at
+                  ? `
+                    <div
+                      class="pos-sales-history-round-info"
+                      style="margin-top:10px;"
+                    >
+                      รอบเริ่มวันที่ ${
+                        new Date(
+                          currentCashRound.started_at
+                        ).toLocaleString(
+                          "th-TH",
+                          {
+                            timeZone:"Asia/Bangkok",
+                            day:"2-digit",
+                            month:"2-digit",
+                            year:"numeric",
+                            hour:"2-digit",
+                            minute:"2-digit",
+                            hour12:false
+                          }
+                        )
+                      } น.
+                    </div>
+                  `
+                  : ""
+              }
+            `
+          : "ยังไม่มีประวัติการปิดยอด";
 
       return;
 
     }
+
+
+      // =================================================
+      // SUMMARY
+      // เงินขาดสะสม / เงินเกินสะสม / ส่วนต่างสุทธิ
+      // =================================================
+
+      let totalShort =
+        0;
+
+      let totalOver =
+        0;
+
+      rows.forEach(
+        row => {
+
+          const remarkText =
+            String(
+              row.remark ||
+              ""
+            );
+
+          const countedMatch =
+            remarkText.match(
+              /นับเงินจริง\s*:\s*([0-9,]+(?:\.[0-9]+)?)\s*บาท/
+            );
+
+          const cashCounted =
+            countedMatch
+              ? Number(
+                  String(
+                    countedMatch[1]
+                  ).replace(
+                    /,/g,
+                    ""
+                  )
+                )
+              : Number(
+                  row.cash_counted ??
+                  0
+                );
+
+          const expectedCash =
+            Number(
+              row.net_cash ??
+              (
+                Number(
+                  row.cash_received ||
+                  0
+                ) -
+                Number(
+                  row.regular_expense ||
+                  0
+                )
+              )
+            );
+
+          const difference =
+            Math.round(
+              (
+                cashCounted -
+                expectedCash
+              ) * 100
+            ) / 100;
+
+          if(difference < 0){
+
+            totalShort +=
+              Math.abs(
+                difference
+              );
+
+          }
+
+          if(difference > 0){
+
+            totalOver +=
+              difference;
+
+          }
+
+        }
+      );
+
+      totalShort =
+        Math.round(
+          totalShort * 100
+        ) / 100;
+
+      totalOver =
+        Math.round(
+          totalOver * 100
+        ) / 100;
+
+      const netDifference =
+        Math.round(
+          (
+            totalOver -
+            totalShort
+          ) * 100
+        ) / 100;
+
+        let netDifferenceClass =
+          "equal";
+
+        if(netDifference < 0){
+
+          netDifferenceClass =
+            "short";
+
+        }
+        else if(netDifference > 0){
+
+          netDifferenceClass =
+            "over";
+
+        }
 
 
     const money =
@@ -3524,15 +4057,150 @@ POS.loadDailyClosingHistory = async function(){
       };
 
 
+    const historyModeInfo =
+      currentMode === "current"
+        ? (
+            currentCashRound?.started_at
+              ? `
+                <div class="pos-sales-history-round-info">
+                  🔵 แสดงเฉพาะรอบปัจจุบัน
+                  • เริ่มรอบ ${
+                    new Date(
+                      currentCashRound.started_at
+                    ).toLocaleString(
+                      "th-TH",
+                      {
+                        timeZone:"Asia/Bangkok",
+                        day:"2-digit",
+                        month:"2-digit",
+                        year:"numeric",
+                        hour:"2-digit",
+                        minute:"2-digit",
+                        hour12:false
+                      }
+                    )
+                  } น.
+                </div>
+              `
+              : ""
+          )
+        : `
+            <div class="pos-sales-history-round-info">
+              📋 แสดงประวัติปิดยอดทั้งหมด
+            </div>
+          `;
+
+
     const html = `
 
+  <!-- =================================================
+       HISTORY MODE INFO
+       ================================================= -->
+
+  ${historyModeInfo}
+
+
+  <!-- =================================================
+       SUMMARY CARDS
+       ================================================= -->
+
+  <div
+    class="pos-sales-closing-summary"
+  >
+
+    <!-- เงินขาดสะสม -->
+
+    <div
+      class="pos-sales-closing-card short"
+    >
+
       <div
-        class="pos-sales-history-table-wrap"
+        class="pos-sales-closing-card-title"
+      >
+        <span
+          class="pos-sales-closing-dot short"
+        ></span>
+
+        เงินขาดสะสม
+      </div>
+
+      <div
+        class="pos-sales-closing-card-value"
+      >
+        ${money(totalShort)}
+        บาท
+      </div>
+
+    </div>
+
+
+    <!-- เงินเกินสะสม -->
+
+    <div
+      class="pos-sales-closing-card over"
+    >
+
+      <div
+        class="pos-sales-closing-card-title"
+      >
+        <span
+          class="pos-sales-closing-dot over"
+        ></span>
+
+        เงินเกินสะสม
+      </div>
+
+      <div
+        class="pos-sales-closing-card-value"
+      >
+        ${money(totalOver)}
+        บาท
+      </div>
+
+    </div>
+
+
+    <!-- ส่วนต่างสุทธิ -->
+
+    <div
+      class="pos-sales-closing-card net ${netDifferenceClass}"
+    >
+
+      <div
+        class="pos-sales-closing-card-title"
+      >
+        📊 ส่วนต่างสุทธิ
+      </div>
+
+      <div
+        class="pos-sales-closing-card-value"
       >
 
-        <table
-          class="pos-sales-history-table"
-        >
+        <span
+          class="pos-sales-closing-dot net ${netDifferenceClass}"
+        ></span>
+
+        ${money(netDifference)}
+        บาท
+
+      </div>
+
+    </div>
+
+  </div>
+
+
+  <!-- =================================================
+       HISTORY TABLE
+       ================================================= -->
+
+  <div
+    class="pos-sales-history-table-wrap"
+  >
+
+    <table
+      class="pos-sales-history-table"
+    >
 
           <thead>
 
@@ -4324,6 +4992,11 @@ POS.openDailyClosingModal =
     // ใช้ค่าที่ส่งมาจากหน้า Sales โดยตรง
     // เพื่อให้ตรงกับ BUSINESS_DATE ที่กำลังปิดยอด
     // -------------------------------------------------
+
+    let salesTotal =
+      Number(
+        data?.salesTotal
+      );
 
     let cashReceived =
       Number(
@@ -5658,7 +6331,7 @@ POS.openDailyClosingModal =
                */
 
               sales_total:
-                cashReceived,
+                salesTotal,
 
               cash_received:
                 cashReceived,
