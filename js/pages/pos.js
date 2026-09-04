@@ -155,6 +155,11 @@ POS.pages.pos = async function () {
                     row.created_at ||
                     null,
 
+                    customer_name:
+                      String(
+                        row.customer_name || ""
+                      ).trim(),
+
                   items: [],
 
                   total: 0,
@@ -162,6 +167,16 @@ POS.pages.pos = async function () {
                   status:
                     "UNPAID"
                 };
+
+              }else if(
+                !bills[billId].customer_name &&
+                row.customer_name
+              ){
+
+                bills[billId].customer_name =
+                  String(
+                    row.customer_name || ""
+                  ).trim();
 
               }
 
@@ -813,7 +828,34 @@ POS.pages.pos = async function () {
             บิล
           </div>
 
-          <div 
+          <div
+            id="posPendingBillSaleDate"
+            class="pos-pending-bill-sale-date"
+          >
+            📅 วันที่ขาย -
+          </div>
+
+          
+          <div class="pos-pending-customer-field">
+
+            <label
+              for="posPendingBillCustomerName"
+              class="pos-pending-customer-label"
+            >
+              👤 ชื่อลูกค้า
+            </label>
+
+            <input
+              type="text"
+              id="posPendingBillCustomerName"
+              class="pos-pending-customer-input"
+              placeholder="กรอกชื่อลูกค้า"
+              autocomplete="off"
+            />
+
+          </div>
+
+<div 
             id="posPendingBillCount"
             style="
               margin-top:-12px;
@@ -1636,12 +1678,78 @@ POS.pages.pos = async function () {
 
             font-weight:700;
 
-            margin-bottom:20px;
+            margin-bottom:4px;
 
           }
 
 
-          .pos-pending-detail-item{
+          .pos-pending-bill-sale-date{
+
+            color:#64748b;
+
+            font-size:14px;
+
+            font-weight:700;
+
+            margin-bottom:16px;
+
+          }
+
+
+          
+          .pos-pending-customer-field{
+
+            margin-bottom:16px;
+
+          }
+
+          .pos-pending-customer-label{
+
+            display:block;
+
+            margin-bottom:7px;
+
+            color:#374151;
+
+            font-size:14px;
+
+            font-weight:800;
+
+          }
+
+          .pos-pending-customer-input{
+
+            width:100%;
+
+            box-sizing:border-box;
+
+            padding:12px 14px;
+
+            border:1px solid #d1d5db;
+
+            border-radius:10px;
+
+            background:#fff;
+
+            color:#111827;
+
+            font-family:inherit;
+
+            font-size:16px;
+
+            outline:none;
+
+          }
+
+          .pos-pending-customer-input:focus{
+
+            border-color:#94a3b8;
+
+            box-shadow:0 0 0 3px #94a3b820;
+
+          }
+
+.pos-pending-detail-item{
 
             display:grid;
 
@@ -3092,7 +3200,12 @@ window.POS.updatePendingBillSales =
           bill.billId,
 
         items:
-          salesItems
+          salesItems,
+
+        customer_name:
+          String(
+            bill.customer_name || ""
+          ).trim()
 
       });
 
@@ -3101,6 +3214,130 @@ window.POS.updatePendingBillSales =
   };
 
 
+
+
+      // ===================================================
+      // FORMAT PENDING BILL SALE DATE
+      // ===================================================
+
+      function formatPendingBillSaleDate(value){
+
+        const raw =
+          String(value || "").trim();
+
+        if(!raw){
+          return "📅 วันที่ขาย -";
+        }
+
+        // -----------------------------------------------------
+        // TIMESTAMP
+        // แปลงเวลาให้เป็นเวลาไทย Asia/Bangkok
+        // -----------------------------------------------------
+        if(
+          /T\d{2}:\d{2}/.test(raw) ||
+          / \d{2}:\d{2}/.test(raw)
+        ){
+
+          const date =
+            new Date(raw);
+
+          if(!Number.isNaN(date.getTime())){
+
+            const parts =
+              new Intl.DateTimeFormat(
+                "en-GB",
+                {
+                  timeZone:"Asia/Bangkok",
+                  year:"numeric",
+                  month:"2-digit",
+                  day:"2-digit",
+                  hour:"2-digit",
+                  minute:"2-digit",
+                  hour12:false
+                }
+              ).formatToParts(date);
+
+            const getPart =
+              type =>
+                parts.find(
+                  part =>
+                    part.type === type
+                )?.value || "";
+
+            const day =
+              getPart("day");
+
+            const month =
+              getPart("month");
+
+            const year =
+              Number(
+                getPart("year")
+              ) + 543;
+
+            const hour =
+              getPart("hour");
+
+            const minute =
+              getPart("minute");
+
+            if(
+              day &&
+              month &&
+              year &&
+              hour &&
+              minute
+            ){
+
+              return (
+                "📅 วันที่ขาย " +
+                day +
+                "/" +
+                month +
+                "/" +
+                year +
+                " " +
+                hour +
+                ":" +
+                minute +
+                " น."
+              );
+
+            }
+
+          }
+
+        }
+
+        // -----------------------------------------------------
+        // DATE ONLY
+        // ถ้าไม่มีเวลา ให้แสดงเฉพาะวันที่เหมือนเดิม
+        // -----------------------------------------------------
+        const match =
+          raw.match(
+            /^(\d{4})-(\d{2})-(\d{2})/
+          );
+
+        if(!match){
+          return "📅 วันที่ขาย -";
+        }
+
+        const year =
+          Number(match[1]) + 543;
+
+        const dateText =
+          match[3] +
+          "/" +
+          match[2] +
+          "/" +
+          year;
+
+        return (
+          "📅 วันที่ขาย " +
+          dateText
+        );
+
+      }
 
 
       // ===================================================
@@ -3136,6 +3373,17 @@ window.POS.updatePendingBillSales =
             "posPendingBillId"
           );
 
+        const billSaleDateEl =
+          document.getElementById(
+            "posPendingBillSaleDate"
+          );
+
+          
+        const billCustomerNameEl =
+          document.getElementById(
+            "posPendingBillCustomerName"
+          );
+
           const billCountEl =
         document.getElementById(
           "posPendingBillCount"
@@ -3166,6 +3414,93 @@ window.POS.updatePendingBillSales =
 
         billIdEl.textContent =
           `บิล ${bill.billId}`;
+
+        if(billSaleDateEl){
+
+          billSaleDateEl.textContent =
+            formatPendingBillSaleDate(
+              bill.createdAt
+            );
+
+        }
+
+          
+        if(billCustomerNameEl){
+
+          billCustomerNameEl.value =
+            String(
+              bill.customer_name || ""
+            );
+
+          billCustomerNameEl.onchange =
+            async () => {
+
+              const oldCustomerName =
+                String(
+                  bill.customer_name || ""
+                );
+
+              const newCustomerName =
+                String(
+                  billCustomerNameEl.value || ""
+                ).trim();
+
+              if(
+                oldCustomerName ===
+                newCustomerName
+              ){
+
+                return;
+
+              }
+
+              bill.customer_name =
+                newCustomerName;
+
+              billCustomerNameEl.disabled =
+                true;
+
+              try{
+
+                await window.POS
+                  .updatePendingBillSales(
+                    bill
+                  );
+
+                savePendingBills();
+                renderPendingBills();
+
+              }catch(error){
+
+                bill.customer_name =
+                  oldCustomerName;
+
+                billCustomerNameEl.value =
+                  oldCustomerName;
+
+                console.error(
+                  "UPDATE PENDING CUSTOMER NAME ERROR:",
+                  error
+                );
+
+                alert(
+                  "บันทึกชื่อลูกค้าไม่สำเร็จ\n\n" +
+                  (
+                    error?.message ||
+                    "กรุณาลองใหม่อีกครั้ง"
+                  )
+                );
+
+              }finally{
+
+                billCustomerNameEl.disabled =
+                  false;
+
+              }
+
+            };
+
+        }
 
           if(billCountEl){
 
@@ -4432,9 +4767,14 @@ if(qtyMode){
               "UNPAID",
 
             remark:
-              bill.billId
+              bill.billId,
 
-          });
+            customer_name:
+              String(
+                bill.customer_name || ""
+              ).trim()
+
+        });
 
 
         if(
@@ -4892,6 +5232,10 @@ pendingBtn.addEventListener(
 
       total:
         total,
+
+      
+      customer_name:
+        "",
 
       status:
         "UNPAID"
