@@ -1818,6 +1818,218 @@ const monthSalesRows = [
 
 
   // ===================================================
+  // ALL PENDING BILLS
+  // ใช้ SALES จาก DATABASE เป็นแหล่งข้อมูลหลัก
+  // + ORDERS จากหน้าโต๊ะที่ยัง UNPAID
+  // แสดงเฉพาะรายการที่ยังไม่รับชำระทั้งหมด
+  // ===================================================
+
+  const allPendingBillMap = new Map();
+
+  // ---------------------------------------------------
+  // SALES / บิลค้างจ่าย
+  // ---------------------------------------------------
+  salesRows
+    .filter(
+      row =>
+        String(
+          row?.payment_status ||
+          ""
+        ).toUpperCase() ===
+        "UNPAID"
+    )
+    .forEach(
+      row => {
+
+        const billId =
+          String(
+            row?.remark ||
+            row?.bill_id ||
+            row?.id ||
+            ""
+          ).trim();
+
+        if(!billId){
+          return;
+        }
+
+        if(!allPendingBillMap.has(billId)){
+          allPendingBillMap.set(
+            billId,
+            {
+              billId,
+              source:"SALES",
+              tableNo:null,
+              total:0,
+              qty:0,
+              createdAt:
+                row?.sold_at ||
+                row?.created_at ||
+                null,
+              customerName:
+                String(
+                  row?.customer_name ||
+                  ""
+                ).trim()
+            }
+          );
+        }
+
+        const bill =
+          allPendingBillMap.get(billId);
+
+        bill.total +=
+          Number(row?.total || 0);
+
+        bill.qty +=
+          Number(row?.qty || 0);
+
+        if(
+          !bill.customerName &&
+          row?.customer_name
+        ){
+          bill.customerName =
+            String(
+              row.customer_name
+            ).trim();
+        }
+
+        if(
+          row?.sold_at ||
+          row?.created_at
+        ){
+          const rowDate =
+            new Date(
+              row.sold_at ||
+              row.created_at
+            );
+
+          const billDate =
+            bill.createdAt
+              ? new Date(
+                  bill.createdAt
+                )
+              : null;
+
+          if(
+            !billDate ||
+            isNaN(billDate.getTime()) ||
+            (
+              !isNaN(rowDate.getTime()) &&
+              rowDate.getTime() <
+                billDate.getTime()
+            )
+          ){
+            bill.createdAt =
+              row.sold_at ||
+              row.created_at;
+          }
+        }
+      }
+    );
+
+
+  // ---------------------------------------------------
+  // ORDERS / หน้าโต๊ะที่ยังไม่ได้รับชำระ
+  // รวมรายการของโต๊ะเดียวกันเป็น 1 รายการ
+  // ---------------------------------------------------
+  orderRows
+    .filter(
+      row =>
+        String(
+          row?.payment_status ||
+          ""
+        ).toUpperCase() ===
+        "UNPAID"
+    )
+    .forEach(
+      row => {
+
+        const tableNo =
+          String(
+            row?.table_no ??
+            ""
+          ).trim();
+
+        if(!tableNo){
+          return;
+        }
+
+        const tableKey =
+          `TABLE:${tableNo}`;
+
+        if(!allPendingBillMap.has(tableKey)){
+          allPendingBillMap.set(
+            tableKey,
+            {
+              billId:tableKey,
+              source:"ORDERS",
+              tableNo,
+              total:0,
+              qty:0,
+              createdAt:
+                row?.ordered_at ||
+                row?.created_at ||
+                null,
+              customerName:""
+            }
+          );
+        }
+
+        const tablePending =
+          allPendingBillMap.get(tableKey);
+
+        tablePending.total +=
+          Number(row?.total || 0);
+
+        tablePending.qty +=
+          Number(row?.qty || 0);
+
+        if(
+          row?.ordered_at ||
+          row?.created_at
+        ){
+          const rowDate =
+            new Date(
+              row.ordered_at ||
+              row.created_at
+            );
+
+          const tableDate =
+            tablePending.createdAt
+              ? new Date(
+                  tablePending.createdAt
+                )
+              : null;
+
+          if(
+            !tableDate ||
+            isNaN(tableDate.getTime()) ||
+            (
+              !isNaN(rowDate.getTime()) &&
+              rowDate.getTime() <
+                tableDate.getTime()
+            )
+          ){
+            tablePending.createdAt =
+              row.ordered_at ||
+              row.created_at;
+          }
+        }
+      }
+    );
+
+
+  const allPendingBills =
+    Array.from(
+      allPendingBillMap.values()
+    ).sort(
+      (a,b) =>
+        new Date(b.createdAt || 0) -
+        new Date(a.createdAt || 0)
+    );
+
+  // ===================================================
   // FORMAT MONEY
   // ===================================================
 
@@ -2545,6 +2757,71 @@ const monthSalesRows = [
       .pos-sales-history-difference.short{color:#dc2626;}
       .pos-sales-history-difference.equal{color:#16a34a;}
 
+      /* =====================================================
+         ALL PENDING BILLS
+         ===================================================== */
+
+      .pos-sales-pending-summary{
+        margin:0 0 10px;
+        color:#d97706;
+        font-size:15px;
+        font-weight:800;
+      }
+
+      .pos-sales-pending-row{
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:20px;
+        padding:17px 0;
+        border-bottom:1px solid #e2e8f0;
+      }
+
+      .pos-sales-pending-row:last-child{
+        border-bottom:none;
+      }
+
+      .pos-sales-pending-left{
+        min-width:0;
+      }
+
+      .pos-sales-pending-bill{
+        font-size:18px;
+        font-weight:900;
+        color:#1e293b;
+      }
+
+      .pos-sales-pending-info{
+        margin-top:5px;
+        font-size:14px;
+        color:#94a3b8;
+        font-weight:600;
+      }
+
+      .pos-sales-pending-right{
+        flex-shrink:0;
+        text-align:right;
+      }
+
+      .pos-sales-pending-money{
+        font-size:20px;
+        font-weight:900;
+        color:#d97706;
+      }
+
+      @media(max-width:700px){
+        .pos-sales-pending-row{
+          align-items:flex-start;
+          flex-direction:column;
+          gap:8px;
+        }
+
+        .pos-sales-pending-right{
+          width:100%;
+          text-align:left;
+        }
+      }
+
       .pos-sales-history-empty,
       .pos-sales-history-loading{
         text-align:center;
@@ -2767,6 +3044,15 @@ const monthSalesRows = [
           onclick="POS.salesTab('history')"
         >
           🧾 ประวัติปิดยอด
+        </button>
+
+        <button
+          type="button"
+          id="posPendingTabButton"
+          class="pos-sales-tab"
+          onclick="POS.salesTab('pending')"
+        >
+          🟡 ค้างจ่ายทั้งหมด
         </button>
 
       </div>
@@ -3468,6 +3754,92 @@ const monthSalesRows = [
 
       </div>
 
+      <!-- =================================================
+           ALL PENDING BILLS
+           ================================================= -->
+
+      <div
+        id="posSalesPendingPanel"
+        class="pos-sales-tab-panel"
+        style="display:none;"
+      >
+
+        <div class="pos-sales-history">
+
+          <div class="pos-sales-history-title">
+            🟡 บิลค้างจ่ายทั้งหมด
+          </div>
+
+          <div class="pos-sales-pending-summary">
+            ค้างจ่าย ${allPendingBills.length} บิล
+          </div>
+
+          ${
+            allPendingBills.length
+              ? allPendingBills.map(
+                  bill => `
+                    <div class="pos-sales-pending-row">
+
+                      <div class="pos-sales-pending-left">
+                        <div class="pos-sales-pending-bill">
+                          ${
+                            bill.source === "ORDERS"
+                              ? `🪑 โต๊ะ ${bill.tableNo}`
+                              : `🧾 ${bill.billId}`
+                          }
+                        </div>
+
+                        <div class="pos-sales-pending-info">
+                          ${
+                            bill.customerName
+                              ? `👤 ${bill.customerName} • `
+                              : ""
+                          }
+                          ${bill.source === "ORDERS" ? "หน้าโต๊ะ • " : ""}
+                          ${bill.qty} รายการ •
+                          ${
+                            bill.createdAt
+                              ? new Date(
+                                  bill.createdAt
+                                ).toLocaleString(
+                                  "th-TH",
+                                  {
+                                    timeZone:"Asia/Bangkok",
+                                    day:"2-digit",
+                                    month:"2-digit",
+                                    year:"numeric",
+                                    hour:"2-digit",
+                                    minute:"2-digit"
+                                  }
+                                )
+                              : ""
+                          }
+                        </div>
+                      </div>
+
+                      <div class="pos-sales-pending-right">
+                        <div class="pos-sales-pending-money">
+                          ${money(bill.total)} บาท
+                        </div>
+                        <div class="pos-sales-status unpaid">
+                          🟡 ค้างจ่าย
+                        </div>
+                      </div>
+
+                    </div>
+                  `
+                ).join("")
+              : `
+                  <div class="pos-sales-empty">
+                    ไม่มีบิลค้างจ่าย
+                  </div>
+                `
+          }
+
+        </div>
+
+      </div>
+
 
     </div>
 
@@ -3489,19 +3861,36 @@ POS.salesTab = async function(tab){
   const historyPanel = document.getElementById("posSalesHistoryPanel");
   const salesButton = document.getElementById("posSalesTabButton");
   const historyButton = document.getElementById("posHistoryTabButton");
+  const pendingPanel = document.getElementById("posSalesPendingPanel");
+  const pendingButton = document.getElementById("posPendingTabButton");
 
-  if(!summary || !closePanel || !listPanel || !historyPanel) return;
+  if(!summary || !closePanel || !listPanel || !historyPanel || !pendingPanel) return;
 
   if(tab === "history"){
     summary.style.display = "none";
     closePanel.style.display = "none";
     listPanel.style.display = "none";
     historyPanel.style.display = "block";
+    pendingPanel.style.display = "none";
 
     salesButton?.classList.remove("active");
     historyButton?.classList.add("active");
+    pendingButton?.classList.remove("active");
 
     await POS.loadDailyClosingHistory();
+    return;
+  }
+
+  if(tab === "pending"){
+    summary.style.display = "none";
+    closePanel.style.display = "none";
+    listPanel.style.display = "none";
+    historyPanel.style.display = "none";
+    pendingPanel.style.display = "block";
+
+    salesButton?.classList.remove("active");
+    historyButton?.classList.remove("active");
+    pendingButton?.classList.add("active");
     return;
   }
 
@@ -3509,8 +3898,10 @@ POS.salesTab = async function(tab){
   closePanel.style.display = "block";
   listPanel.style.display = "block";
   historyPanel.style.display = "none";
+  pendingPanel.style.display = "none";
 
   historyButton?.classList.remove("active");
+  pendingButton?.classList.remove("active");
   salesButton?.classList.add("active");
 
 };
