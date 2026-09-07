@@ -688,6 +688,462 @@ POS.api = {
 
 
   // =================================================
+  // INGREDIENTS / STOCK
+  // =================================================
+
+  ingredientsList() {
+
+    return this.call(
+      "ingredients",
+      {
+        method: "GET"
+      }
+    );
+
+  },
+
+
+  // =================================================
+  // INGREDIENT ADD
+  // =================================================
+
+  ingredientAdd(data) {
+
+    return this.call(
+      "ingredients",
+      {
+        method: "POST",
+
+        body: {
+
+          action:
+            "ADD",
+
+          name:
+            data.name,
+
+          base_unit:
+            data.base_unit || data.unit,
+
+          minimum:
+            data.minimum ?? 0
+
+        }
+
+      }
+    );
+
+  },
+
+
+  // =================================================
+  // INGREDIENT UPDATE
+  // =================================================
+
+  ingredientUpdate(data) {
+
+    return this.call(
+      "ingredients",
+      {
+        method: "PUT",
+
+        body: {
+
+          action:
+            "UPDATE",
+
+          id:
+            data.id,
+
+          name:
+            data.name,
+
+          base_unit:
+            data.base_unit || data.unit,
+
+          minimum:
+            data.minimum ?? 0
+
+        }
+
+      }
+    );
+
+  },
+
+
+  // =================================================
+  // INGREDIENT DELETE
+  // =================================================
+
+  ingredientDelete(id) {
+
+    return this.call(
+      "ingredients",
+      {
+        method: "POST",
+
+        body: {
+
+          action:
+            "DELETE",
+
+          id:
+            id
+
+        }
+
+      }
+    );
+
+  },
+
+
+  // =================================================
+  // PURCHASE UNITS
+  // หน่วยซื้อ
+  // =================================================
+
+  purchaseUnitsList() {
+
+    return this.call(
+      "units",
+      {
+        method: "GET"
+      }
+    );
+
+  },
+
+
+  // =================================================
+  // PURCHASE UNIT ADD
+  // =================================================
+
+  purchaseUnitAdd(data) {
+
+    return this.call(
+      "units",
+      {
+        method: "POST",
+
+        body: {
+
+          action:
+            "ADD",
+
+          ingredient_id:
+            data.ingredient_id,
+
+          unit_name:
+            data.unit_name,
+
+          multiple:
+            data.multiple ?? 1,
+
+          base_qty:
+            data.base_qty ?? 1,
+
+          cost_per_unit:
+            data.cost_per_unit ?? 0
+
+        }
+
+      }
+    );
+
+  },
+
+
+  // =================================================
+  // PURCHASE UNIT UPDATE
+  // =================================================
+
+  purchaseUnitUpdate(data) {
+
+    return this.call(
+      "units",
+      {
+        method: "PUT",
+
+        body: {
+
+          action:
+            "UPDATE",
+
+          id:
+            data.id,
+
+          ingredient_id:
+            data.ingredient_id,
+
+          unit_name:
+            data.unit_name,
+
+          multiple:
+            data.multiple ?? 1,
+
+          base_qty:
+            data.base_qty ?? 1,
+
+          cost_per_unit:
+            data.cost_per_unit ?? 0,
+
+          active:
+            data.active ?? true
+
+        }
+
+      }
+    );
+
+  },
+
+
+  // =================================================
+  // PURCHASE UNIT DELETE
+  // =================================================
+
+  purchaseUnitDelete(id) {
+
+    return this.call(
+      "units",
+      {
+        method: "POST",
+
+        body: {
+
+          action:
+            "DELETE",
+
+          id:
+            id
+
+        }
+
+      }
+    );
+
+  },
+
+
+  // =================================================
+  // PURCHASE
+  // บันทึกบิลซื้อเข้า
+  // =================================================
+
+  purchaseAdd(data) {
+
+    return this.call(
+      "purchase",
+      {
+        method: "POST",
+
+        body: {
+          bill_no:
+            data.bill_no,
+
+          purchase_date:
+            data.purchase_date,
+
+          supplier:
+            data.supplier,
+
+          remark:
+            data.remark || "",
+
+          items:
+            Array.isArray(data.items)
+              ? data.items.map(item => ({
+                  ingredient_id:
+                    item.ingredient_id,
+
+                  purchase_unit_id:
+                    item.purchase_unit_id || null,
+
+                  quantity:
+                    item.quantity,
+
+                  multiple:
+                    item.multiple ?? 1,
+
+                  base_qty:
+                    item.base_qty ?? item.quantity,
+
+                  total:
+                    item.total
+                }))
+              : []
+        }
+
+      }
+    );
+
+  },
+
+
+  // =================================================
+  // STOCK MOVEMENT
+  // รายการเคลื่อนไหวสต็อก
+  // =================================================
+
+  movementList() {
+
+    return this.call(
+      "movements",
+      {
+        method: "GET"
+      }
+    );
+
+  },
+
+
+  // =================================================
+  // STOCK COUNT
+  // บันทึกการตรวจนับสต็อก
+  // =================================================
+
+  stockCountAdd(data) {
+
+    return this.call(
+      "stock-count",
+      {
+        method: "POST",
+
+        body: {
+          items:
+            Array.isArray(data?.items)
+              ? data.items.map(item => ({
+                  ingredient_id:
+                    item.ingredient_id,
+
+                  counted_qty:
+                    item.counted_qty,
+
+                  remark:
+                    item.remark || ""
+                }))
+              : []
+        }
+
+      }
+    );
+
+  },
+
+
+  // =================================================
+  // RECIPES
+  // สูตรอาหาร
+  // =================================================
+
+  recipesList() {
+
+    return this.call(
+      "recipes",
+      {
+        method: "GET"
+      }
+    );
+
+  },
+
+
+  // =================================================
+  // RECIPE ADD
+  // เพิ่มวัตถุดิบเข้าในสูตร
+  // =================================================
+
+  recipeAdd(data) {
+
+    return this.call(
+      "recipes",
+      {
+        method: "POST",
+
+        body: {
+
+          action:
+            "ADD",
+
+          menu_id:
+            data.menu_id,
+
+          ingredient_id:
+            data.ingredient_id,
+
+          qty:
+            data.qty
+
+        }
+
+      }
+    );
+
+  },
+
+
+  // =================================================
+  // RECIPE UPDATE
+  // แก้จำนวนวัตถุดิบในสูตร
+  // =================================================
+
+  recipeUpdate(data) {
+
+    return this.call(
+      "recipes",
+      {
+        method: "POST",
+
+        body: {
+
+          action:
+            "UPDATE",
+
+          id:
+            data.id,
+
+          qty:
+            data.qty
+
+        }
+
+      }
+    );
+
+  },
+
+
+  // =================================================
+  // RECIPE DELETE
+  // ลบวัตถุดิบออกจากสูตร
+  // =================================================
+
+  recipeDelete(id) {
+
+    return this.call(
+      "recipes",
+      {
+        method: "POST",
+
+        body: {
+
+          action:
+            "DELETE",
+
+          id:
+            id
+
+        }
+
+      }
+    );
+
+  },
+
+
+  // =================================================
   // CASH ROUND
   // STEP 3
   // =================================================
