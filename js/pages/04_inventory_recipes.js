@@ -1188,6 +1188,18 @@ POS.inventoryRecipesEnsureModal = function(){
                 outline:none;
               "
             ></select>
+
+            <div
+              id="posInventoryRecipesExistingArea"
+              style="
+                display:none;
+                margin-top:10px;
+                padding:12px;
+                border:1px solid #e2e8f0;
+                border-radius:10px;
+                background:#f8fafc;
+              "
+            ></div>
           </div>
 
 
@@ -1390,24 +1402,177 @@ POS.inventoryRecipesFillSelects = function(){
       .join("");
 
 
-  ingredientSelect.innerHTML =
-    `<option value="">-- เลือกวัตถุดิบ --</option>` +
-    POS.inventoryRecipesIngredients
-      .map(function(item){
+  function renderIngredientsForMenu(){
 
-        return `
-          <option
-            value="${POS.inventoryRecipesEscape(item.id)}"
-            data-unit="${POS.inventoryRecipesEscape(item.base_unit || "")}"
-          >
-            ${POS.inventoryRecipesEscape(item.sku || "-")}
-            —
-            ${POS.inventoryRecipesEscape(item.name || "-")}
-          </option>
-        `;
+    const menuId =
+      String(
+        menuSelect.value || ""
+      );
 
-      })
-      .join("");
+    const usedIngredientIds =
+      new Set(
+        POS.inventoryRecipesData
+          .filter(function(recipe){
+            return String(
+              recipe?.menu_id || ""
+            ) === menuId;
+          })
+          .map(function(recipe){
+            return String(
+              recipe?.ingredient_id || ""
+            );
+          })
+          .filter(Boolean)
+      );
+
+
+    ingredientSelect.innerHTML =
+      `<option value="">-- เลือกวัตถุดิบ --</option>` +
+      POS.inventoryRecipesIngredients
+        .filter(function(item){
+          return !usedIngredientIds.has(
+            String(item?.id || "")
+          );
+        })
+        .map(function(item){
+
+          return `
+            <option
+              value="${POS.inventoryRecipesEscape(item.id)}"
+              data-unit="${POS.inventoryRecipesEscape(item.base_unit || "")}"
+            >
+              ${POS.inventoryRecipesEscape(item.sku || "-")}
+              —
+              ${POS.inventoryRecipesEscape(item.name || "-")}
+            </option>
+          `;
+
+        })
+        .join("");
+
+  }
+
+
+  function renderExistingIngredientsForMenu(){
+
+    const existingArea =
+      document.getElementById(
+        "posInventoryRecipesExistingArea"
+      );
+
+    if(!existingArea){
+      return;
+    }
+
+    const menuId =
+      String(
+        menuSelect.value || ""
+      );
+
+    if(!menuId){
+      existingArea.style.display = "none";
+      existingArea.innerHTML = "";
+      return;
+    }
+
+    const existingRecipes =
+      POS.inventoryRecipesData
+        .filter(function(recipe){
+          return String(
+            recipe?.menu_id || ""
+          ) === menuId;
+        });
+
+    existingArea.style.display = "block";
+
+    if(!existingRecipes.length){
+      existingArea.innerHTML = `
+        <div style="
+          font-size:13px;
+          font-weight:800;
+          color:#64748b;
+        ">
+          📋 วัตถุดิบที่มีอยู่ในสูตร
+        </div>
+        <div style="
+          margin-top:6px;
+          font-size:12px;
+          color:#94a3b8;
+        ">
+          ยังไม่มีวัตถุดิบในสูตรนี้
+        </div>
+      `;
+      return;
+    }
+
+    existingArea.innerHTML = `
+      <div style="
+        font-size:13px;
+        font-weight:800;
+        color:#334155;
+        margin-bottom:8px;
+      ">
+        📋 วัตถุดิบที่มีอยู่ในสูตร
+      </div>
+
+      <div style="
+        display:grid;
+        gap:6px;
+      ">
+        ${existingRecipes.map(function(recipe){
+          return `
+            <div style="
+              display:flex;
+              align-items:center;
+              justify-content:space-between;
+              gap:12px;
+              padding:8px 10px;
+              border-radius:8px;
+              background:#fff;
+              border:1px solid #eef1f4;
+            ">
+              <div style="
+                min-width:0;
+                font-size:13px;
+                font-weight:700;
+                color:#334155;
+              ">
+                ${POS.inventoryRecipesEscape(recipe.ingredient_name || recipe.ingredient_sku || "-")}
+              </div>
+              <div style="
+                flex-shrink:0;
+                font-size:12px;
+                font-weight:800;
+                color:#64748b;
+              ">
+                ${Number(recipe.qty || 0).toLocaleString("th-TH", {maximumFractionDigits:6})}
+                ${POS.inventoryRecipesEscape(recipe.base_unit || "")} / 1 เมนู
+              </div>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    `;
+  }
+
+
+  menuSelect.onchange =
+    function(){
+
+      renderIngredientsForMenu();
+      renderExistingIngredientsForMenu();
+
+      const unitLabel =
+        document.getElementById(
+          "posInventoryRecipesUnitLabel"
+        );
+
+      if(unitLabel){
+        unitLabel.textContent =
+          "หน่วยหลัก";
+      }
+
+    };
 
 
   ingredientSelect.onchange =
@@ -1520,6 +1685,9 @@ POS.inventoryRecipesOpenAdd = function(){
 
   if(menuSelect){
     menuSelect.value = "";
+    menuSelect.dispatchEvent(
+      new Event("change")
+    );
   }
 
   if(ingredientSelect){
@@ -1589,6 +1757,26 @@ POS.inventoryRecipesOpenAdd = function(){
       if(!Number.isFinite(qty) || qty <= 0){
         POS.inventoryRecipesFormError(
           "กรุณากรอกจำนวนให้มากกว่า 0"
+        );
+        return;
+      }
+
+
+      const duplicateRecipe =
+        POS.inventoryRecipesData.some(
+          function(recipe){
+            return String(
+              recipe?.menu_id || ""
+            ) === menuId &&
+            String(
+              recipe?.ingredient_id || ""
+            ) === ingredientId;
+          }
+        );
+
+      if(duplicateRecipe){
+        POS.inventoryRecipesFormError(
+          "วัตถุดิบนี้มีอยู่ในสูตรของเมนูนี้แล้ว"
         );
         return;
       }
