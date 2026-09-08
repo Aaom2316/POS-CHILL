@@ -14,6 +14,7 @@ POS.pages.inventory = async function(){
            ================================================= -->
 
       <div
+        class="inventory-menu-grid"
         style="
           display:grid;
           grid-template-columns:repeat(3, minmax(0, 1fr));
