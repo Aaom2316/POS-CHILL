@@ -1418,6 +1418,18 @@ POS.inventoryItemsLoad = async function(){
 
     POS.inventoryItemsRender();
 
+    // บังคับให้ browser คำนวณ layout ใหม่หลังเติมรายการ
+    // แก้ปัญหา scroll เพี้ยนเฉพาะครั้งแรกหลังเปิดหน้า 01
+    requestAnimationFrame(function(){
+      requestAnimationFrame(function(){
+        const page = document.querySelector(".inventory-subpage");
+        if(page){
+          void page.offsetHeight;
+        }
+        window.dispatchEvent(new Event("resize"));
+      });
+    });
+
   }catch(error){
 
     console.error(
@@ -1947,6 +1959,11 @@ POS.inventoryItemsRender = function(){
       `;
 
     }).join("");
+
+  // ให้ตารางและความสูงของหน้า settle ก่อนการ scroll
+  requestAnimationFrame(function(){
+    void body.offsetHeight;
+  });
 
 };
 
