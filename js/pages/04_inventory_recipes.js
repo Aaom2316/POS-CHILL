@@ -315,18 +315,14 @@ POS.pages.inventoryRecipes = async function(){
         </div>
 
 
-        <div class="pos-recipes-table-scroll" style="
+        <div style="
           overflow-x:auto;
-          overflow-y:hidden;
-          -webkit-overflow-scrolling:touch;
-          border-top:1px solid #eef1f4;
         ">
 
           <table style="
             width:100%;
-            min-width:900px;
             border-collapse:collapse;
-            table-layout:fixed;
+            min-width:980px;
           ">
 
             <thead>
