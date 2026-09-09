@@ -98,6 +98,43 @@ POS.inventoryItemsPrefetch = function(forceReload = false){
 
 POS.pages.inventoryItems = async function(){
 
+  /*
+     IMPORTANT:
+     รอข้อมูลวัตถุดิบที่ prefetch ไว้ให้พร้อมก่อนส่ง HTML
+     กลับไปให้ Router เพื่อไม่ให้หน้า 01 ถูกสร้างก่อนข้อมูล
+     แล้วค่อยขยายความสูงของตารางภายหลัง
+
+     ลำดับใหม่:
+     API/PREFETCH พร้อม
+       -> Router ได้ HTML
+       -> ใส่ Page 01 ลง DOM
+       -> AUTO LOAD render ทันทีจาก cache
+       -> ความสูงของตารางถูกสร้างครั้งเดียว
+  */
+  try{
+
+    if(
+      POS.api &&
+      typeof POS.api.ingredientsList === "function" &&
+      typeof POS.api.purchaseUnitsList === "function" &&
+      typeof POS.inventoryItemsPrefetch === "function"
+    ){
+      await POS.inventoryItemsPrefetch(false);
+    }
+
+  }catch(error){
+
+    /*
+       ถ้า prefetch มีปัญหา ไม่ทำให้เปิดหน้าไม่ได้
+       AUTO LOAD ด้านล่างจะลองโหลดข้อมูลอีกครั้งหลัง DOM พร้อม
+    */
+    console.warn(
+      "เตรียมข้อมูลวัตถุดิบก่อนสร้างหน้าไม่สำเร็จ:",
+      error
+    );
+
+  }
+
   return `
     <div class="inventory-subpage">
 
@@ -2472,9 +2509,31 @@ POS.inventoryItemsDelete = async function(id){
   if(document.body){
 
     const observer =
-      new MutationObserver(function(){
+      new MutationObserver(function(mutations){
 
-        loadWhenReady();
+        for(const mutation of mutations){
+
+          if(!mutation.addedNodes || !mutation.addedNodes.length){
+            continue;
+          }
+
+          for(const node of mutation.addedNodes){
+
+            if(
+              node &&
+              node.nodeType === 1 &&
+              (
+                node.id === "inventoryItemsTableBody" ||
+                node.querySelector?.("#inventoryItemsTableBody")
+              )
+            ){
+              loadWhenReady();
+              return;
+            }
+
+          }
+
+        }
 
       });
 
