@@ -306,8 +306,6 @@ POS.pages.inventoryRecipes = async function(){
 
         <div style="
           overflow-x:auto;
-          overflow-y:hidden;
-          -webkit-overflow-scrolling:touch;
           border-top:1px solid #eef1f4;
         ">
 
@@ -599,133 +597,10 @@ POS.inventoryRecipesMessage = function(
 
 
 /* =====================================================
-   RECIPES : TEMP DIAGNOSTIC (REMOVE AFTER TEST)
-   ===================================================== */
-
-POS.inventoryRecipesDiagnostic = {
-  start: 0,
-  api: 0,
-  render: 0,
-  total: 0
-};
-
-POS.inventoryRecipesDiagnosticShow = function(){
-
-  let box =
-    document.getElementById(
-      "posInventoryRecipesDiagnostic"
-    );
-
-  if(!box){
-    box = document.createElement("div");
-
-    box.id =
-      "posInventoryRecipesDiagnostic";
-
-    box.style.cssText = `
-      position:fixed;
-      right:12px;
-      bottom:12px;
-      z-index:999999;
-      width:min(310px,calc(100vw - 24px));
-      box-sizing:border-box;
-      padding:14px 16px;
-      border-radius:14px;
-      background:#0f172a;
-      color:#fff;
-      font-family:Arial,sans-serif;
-      font-size:13px;
-      line-height:1.55;
-      box-shadow:0 10px 30px rgba(0,0,0,.25);
-    `;
-
-    document.body.appendChild(box);
-  }
-
-  const d =
-    POS.inventoryRecipesDiagnostic;
-
-  box.innerHTML = `
-    <div style="
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      gap:10px;
-      margin-bottom:8px;
-    ">
-      <strong style="font-size:14px;">
-        🔍 RECIPES LOAD DIAGNOSTIC
-      </strong>
-
-      <button
-        type="button"
-        onclick="
-          document.getElementById('posInventoryRecipesDiagnostic')?.remove()
-        "
-        style="
-          border:0;
-          background:transparent;
-          color:#cbd5e1;
-          font-size:18px;
-          cursor:pointer;
-          padding:0;
-        "
-      >×</button>
-    </div>
-
-    <div style="
-      display:grid;
-      grid-template-columns:1fr auto;
-      gap:3px 14px;
-    ">
-      <span>API / โหลดข้อมูล</span>
-      <strong>${Math.round(d.api)} ms</strong>
-
-      <span>JS / สร้างตาราง</span>
-      <strong>${Math.round(d.render)} ms</strong>
-
-      <span style="
-        border-top:1px solid #334155;
-        padding-top:5px;
-        margin-top:3px;
-      ">TOTAL</span>
-
-      <strong style="
-        border-top:1px solid #334155;
-        padding-top:5px;
-        margin-top:3px;
-      ">${Math.round(d.total)} ms</strong>
-    </div>
-
-    <div style="
-      margin-top:8px;
-      padding-top:8px;
-      border-top:1px solid #334155;
-      color:#cbd5e1;
-      font-size:12px;
-    ">
-      สูตร ${Array.isArray(POS.inventoryRecipesData) ? POS.inventoryRecipesData.length : 0}
-      · เมนู ${Array.isArray(POS.inventoryRecipesMenus) ? POS.inventoryRecipesMenus.length : 0}
-      · วัตถุดิบ ${Array.isArray(POS.inventoryRecipesIngredients) ? POS.inventoryRecipesIngredients.length : 0}
-    </div>
-  `;
-};
-
-/* =====================================================
    RECIPES : LOAD
    ===================================================== */
 
 POS.inventoryRecipesLoad = async function(){
-
-  const diagnostic =
-    POS.inventoryRecipesDiagnostic;
-
-  diagnostic.start =
-    performance.now();
-
-  diagnostic.api = 0;
-  diagnostic.render = 0;
-  diagnostic.total = 0;
 
   const body =
     document.getElementById(
@@ -751,14 +626,8 @@ POS.inventoryRecipesLoad = async function(){
 
   try{
 
-    const apiStart =
-      performance.now();
-
     const result =
       await POS.api.recipesList();
-
-    diagnostic.api =
-      performance.now() - apiStart;
 
     if(
       !result ||
@@ -789,18 +658,7 @@ POS.inventoryRecipesLoad = async function(){
         ? data.ingredients
         : [];
 
-    const renderStart =
-      performance.now();
-
     POS.inventoryRecipesRender();
-
-    diagnostic.render =
-      performance.now() - renderStart;
-
-    diagnostic.total =
-      performance.now() - diagnostic.start;
-
-    POS.inventoryRecipesDiagnosticShow();
 
   }catch(error){
 
@@ -808,11 +666,6 @@ POS.inventoryRecipesLoad = async function(){
       "inventoryRecipesLoad error:",
       error
     );
-
-    diagnostic.total =
-      performance.now() - diagnostic.start;
-
-    POS.inventoryRecipesDiagnosticShow();
 
     body.innerHTML = `
       <tr>
