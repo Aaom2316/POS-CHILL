@@ -1493,30 +1493,8 @@ POS.inventoryItemsLoad = async function(forceReload = false){
     POS.inventoryItemsRender();
 
 
-    /*
-      ให้ browser คำนวณ layout หลัง DOM ตารางถูกเติมแล้ว
-      แก้เฉพาะจังหวะ initial render ของ Page 01
-    */
-    if(typeof requestAnimationFrame === "function"){
-
-      requestAnimationFrame(function(){
-
-        requestAnimationFrame(function(){
-
-          const page =
-            document.querySelector(".inventory-subpage");
-
-          if(page){
-
-            void page.offsetHeight;
-            window.dispatchEvent(new Event("resize"));
-
-          }
-
-        });
-
-      });
-
+    if(typeof POS.inventoryItemsFixScroll === "function"){
+      POS.inventoryItemsFixScroll();
     }
 
   }catch(error){
@@ -1548,6 +1526,141 @@ POS.inventoryItemsLoad = async function(forceReload = false){
 
   }
 
+};
+
+
+/* =====================================================
+   FIRST OPEN SCROLL FIX
+   บังคับให้ scroll container คำนวณความสูงใหม่หลัง
+   Page 01 ถูกสร้างแบบ SPA โดยไม่ต้องกด Refresh
+   ===================================================== */
+POS.inventoryItemsFixScroll = function(){
+
+  const settle = function(){
+
+    const page =
+      document.querySelector(".inventory-subpage");
+
+    if(!page){
+      return;
+    }
+
+    const candidates = [];
+    let node = page;
+
+    while(node && node !== document.body){
+      candidates.push(node);
+      node = node.parentElement;
+    }
+
+    if(document.scrollingElement){
+      candidates.push(document.scrollingElement);
+    }
+
+    candidates.push(document.documentElement);
+
+    const seen = new Set();
+
+    candidates.forEach(function(el){
+
+      if(!el || seen.has(el)){
+        return;
+      }
+
+      seen.add(el);
+
+      const style =
+        window.getComputedStyle(el);
+
+      const overflowY =
+        String(style.overflowY || "").toLowerCase();
+
+      const isScrollContainer =
+        overflowY === "auto" ||
+        overflowY === "scroll" ||
+        el === document.scrollingElement;
+
+      if(!isScrollContainer){
+        return;
+      }
+
+      /* บังคับ layout calculation */
+      void el.offsetHeight;
+      void el.scrollHeight;
+      void el.clientHeight;
+
+      /*
+        Safari/iOS บางครั้งค้าง scroll geometry ของ
+        fixed/SPA container จาก frame ก่อนหน้า
+      */
+      const originalOverflowY =
+        el.style.overflowY;
+
+      el.style.overflowY = "hidden";
+      void el.offsetHeight;
+      void el.scrollHeight;
+      el.style.overflowY =
+        originalOverflowY || "auto";
+
+      /* ให้ iOS ใช้ touch scrolling กับ container เดิม */
+      el.style.webkitOverflowScrolling = "touch";
+
+      void el.offsetHeight;
+      void el.scrollHeight;
+    });
+
+    window.dispatchEvent(
+      new Event("resize")
+    );
+
+    /* สะกิด scroll geometry โดยไม่เปลี่ยนตำแหน่งผู้ใช้ */
+    const scrollHost =
+      candidates.find(function(el){
+
+        if(!el){
+          return false;
+        }
+
+        if(el === document.scrollingElement){
+          return true;
+        }
+
+        const style =
+          window.getComputedStyle(el);
+
+        return (
+          style.overflowY === "auto" ||
+          style.overflowY === "scroll"
+        );
+      });
+
+    if(scrollHost){
+      const currentTop =
+        scrollHost.scrollTop;
+
+      void scrollHost.scrollHeight;
+      scrollHost.scrollTop = currentTop;
+    }
+  };
+
+  if(typeof requestAnimationFrame === "function"){
+
+    requestAnimationFrame(function(){
+      settle();
+
+      requestAnimationFrame(function(){
+        settle();
+      });
+    });
+
+  }else{
+    settle();
+  }
+
+  /* มือถือบางเครื่องเปลี่ยน viewport หลัง frame แรก */
+  setTimeout(settle, 120);
+  setTimeout(settle, 350);
+  setTimeout(settle, 700);
 };
 
 
