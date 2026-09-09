@@ -119,7 +119,8 @@ POS.pages.inventoryItems = async function(){
       typeof POS.api.purchaseUnitsList === "function" &&
       typeof POS.inventoryItemsPrefetch === "function"
     ){
-      await POS.inventoryItemsPrefetch(false);
+      /* เปิด Page 01 = โหลดใหม่เหมือนกด Refresh */
+      await POS.inventoryItemsPrefetch(true);
     }
 
   }catch(error){
@@ -1530,14 +1531,6 @@ POS.inventoryItemsLoad = async function(forceReload = false){
     */
     POS.inventoryItemsRender();
 
-    /*
-      IMPORTANT: Page 01 ต้องสร้างรายการทั้งหมดในครั้งเดียว
-      ไม่ปล่อยให้ browser/WebView เลื่อนแล้วค่อย paint รายการถัดไป
-      บังคับให้ tbody/table/layout คำนวณครบทั้งชุดก่อนเปิดให้ผู้ใช้เลื่อน
-    */
-    if(typeof POS.inventoryItemsForceFullRender === "function"){
-      POS.inventoryItemsForceFullRender();
-    }
 
     if(typeof POS.inventoryItemsFixScroll === "function"){
       POS.inventoryItemsFixScroll();
@@ -1572,61 +1565,6 @@ POS.inventoryItemsLoad = async function(forceReload = false){
 
   }
 
-};
-
-
-/* =====================================================
-   FORCE FULL FIRST RENDER
-   ให้ Page 01 สร้าง DOM + layout ของรายการทั้งหมดในครั้งเดียว
-   ไม่ให้เกิดอาการเห็นทีละชุดเมื่อเลื่อนลง
-   ===================================================== */
-POS.inventoryItemsForceFullRender = function(){
-
-  const page =
-    document.querySelector(".inventory-subpage");
-
-  if(!page){
-    return;
-  }
-
-  const body =
-    document.getElementById("inventoryItemsTableBody");
-
-  if(!body){
-    return;
-  }
-
-  const table = body.closest("table");
-
-  /* ปิด browser content-visibility/contain ที่อาจติดมาจาก CSS ภายนอก */
-  page.style.contentVisibility = "visible";
-  page.style.contain = "none";
-  body.style.contentVisibility = "visible";
-  body.style.contain = "none";
-
-  if(table){
-    table.style.contentVisibility = "visible";
-    table.style.contain = "none";
-  }
-
-  /*
-    อ่าน layout ของทุกแถวแบบ synchronous
-    เพื่อบังคับให้ browser คำนวณรายการทั้งหมดทันที
-    ก่อนผู้ใช้จะเริ่ม scroll
-  */
-  const rows = body.querySelectorAll("tr");
-
-  for(let i = 0; i < rows.length; i++){
-    void rows[i].offsetHeight;
-  }
-
-  if(table){
-    void table.offsetHeight;
-    void table.scrollHeight;
-  }
-
-  void body.offsetHeight;
-  void body.scrollHeight;
 };
 
 
@@ -2273,10 +2211,6 @@ POS.inventoryItemsRender = function(){
 POS.inventoryItemsFilter = function(){
 
   POS.inventoryItemsRender();
-
-  if(typeof POS.inventoryItemsForceFullRender === "function"){
-    POS.inventoryItemsForceFullRender();
-  }
 
 };
 
