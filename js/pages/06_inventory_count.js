@@ -421,9 +421,8 @@ POS.pages.inventoryCount = async function(){
   `;
 
   /*
-   * เมื่อเปิดหน้า ตรวจนับจากเมนู โดยไฟล์ JS ถูกโหลดมาก่อนแล้ว
-   * ให้เรียก init หลัง DOM ของหน้านี้ถูกใส่เข้าหน้าเว็บแล้ว
-   * เพื่อโหลดข้อมูลทันทีโดยไม่ต้องกดรีโหลดหน้าเว็บ
+   * เรียก Init หลังจาก HTML ของหน้า 06 ถูกส่งกลับแล้ว
+   * ใช้ setTimeout เพียง 1 ครั้ง เพื่อรอให้ DOM ถูกใส่เข้าหน้าเว็บก่อน
    */
   setTimeout(function(){
     if(typeof POS.inventoryCountInit === "function"){
@@ -2438,7 +2437,5 @@ POS.inventoryCountSave = async function(){
 
   };
 
-
-  POS.inventoryCountInit();
 
 })();
