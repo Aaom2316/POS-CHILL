@@ -366,6 +366,7 @@ POS.pages.inventoryItems = async function(){
           style="
             width:100%;
             overflow-x:auto;
+            overflow-y:hidden;
           "
         >
 
