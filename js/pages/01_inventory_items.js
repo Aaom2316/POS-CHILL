@@ -12,6 +12,11 @@ POS.inventoryPurchaseUnitsData = [];
 
 POS.pages.inventoryItems = async function(){
 
+  /*
+    หน้า 01 ถูกสร้างใหม่ = เริ่มรอบ auto-refresh ใหม่ 1 ครั้ง
+  */
+  POS.inventoryItemsAutoRefreshDone = false;
+
   return `
     <div class="inventory-subpage">
 
@@ -1441,6 +1446,34 @@ POS.inventoryItemsLoad = async function(){
 
 
     POS.inventoryItemsRender();
+
+
+    /*
+      หลังโหลดรายการครั้งแรกเสร็จ ให้ทำ "รีเฟรช" ของ Page 01
+      อัตโนมัติ 1 ครั้ง เหมือนกดปุ่ม 🔄 รีเฟรชเอง
+      เพื่อให้ DOM / layout ถูกสร้างและคำนวณใหม่อีกครั้ง
+      ก่อนผู้ใช้เริ่มเลื่อนรายการ
+    */
+    if(!POS.inventoryItemsAutoRefreshDone){
+
+      POS.inventoryItemsAutoRefreshDone = true;
+
+      setTimeout(function(){
+
+        const tableBody =
+          document.getElementById(
+            "inventoryItemsTableBody"
+          );
+
+        if(tableBody){
+
+          POS.inventoryItemsLoad();
+
+        }
+
+      }, 0);
+
+    }
 
 
     /*
