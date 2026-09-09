@@ -8,14 +8,17 @@ POS.pages = POS.pages || {};
 POS.pages.inventoryRecipes = async function(){
 
   /*
-   * ให้ทำงานแบบเดียวกับ Stock Page 05 : Movement
-   * คืน HTML ให้ Router สร้าง DOM ก่อน แล้วค่อย INIT/LOAD
+   * ตอนเปิดผ่าน Stock Router จะให้ Router เป็นผู้ LOAD หลัง DOM settle
+   * เพื่อไม่ให้โหลดซ้ำกับ setTimeout ของ page factory
+   * กรณีเรียก page factory โดยตรงจึงยัง LOAD แบบเดิมได้
    */
-  setTimeout(function(){
-    if(typeof POS.inventoryRecipesLoad === "function"){
-      POS.inventoryRecipesLoad();
-    }
-  }, 0);
+  if(!POS.inventoryRecipesOpening){
+    setTimeout(function(){
+      if(typeof POS.inventoryRecipesLoad === "function"){
+        POS.inventoryRecipesLoad();
+      }
+    }, 0);
+  }
 
   return `
     <div class="inventory-subpage">
@@ -1037,60 +1040,6 @@ POS.inventoryRecipesRender = function(){
       `;
 
     }).join("");
-
-  /* =================================================
-     IPAD / SAFARI : POST-RENDER LAYOUT SETTLE
-
-     จุดสำคัญ: Refresh แล้วรายการแสดงครบเร็วขึ้น
-     แปลว่าปัญหาเกิดหลัง DOM ถูกสร้าง ไม่ใช่ API/JS
-     ให้ Safari คำนวณความสูงของ tbody/table/scroll host
-     หลังใส่ข้อมูลจริงทันที แทนที่จะปล่อยให้ค่อยๆ paint
-     ตามการ scroll
-     ================================================= */
-  (function(){
-    const table = body.closest("table");
-    const scrollHost = table ? table.parentElement : null;
-    const card = scrollHost ? scrollHost.parentElement : null;
-    const pageContent = document.getElementById("pageContent");
-
-    /* บังคับ layout รอบแรกทันทีหลัง innerHTML */
-    void body.offsetHeight;
-    if(table){
-      void table.offsetHeight;
-      void table.scrollHeight;
-    }
-    if(scrollHost){
-      void scrollHost.offsetHeight;
-      void scrollHost.scrollHeight;
-    }
-    if(card){
-      void card.offsetHeight;
-      void card.scrollHeight;
-    }
-    if(pageContent){
-      void pageContent.offsetHeight;
-      void pageContent.scrollHeight;
-    }
-
-    /* อีก 1 frame ให้ Safari commit paint ของตาราง */
-    if(typeof requestAnimationFrame === "function"){
-      requestAnimationFrame(function(){
-        void body.offsetHeight;
-        if(table){
-          void table.offsetHeight;
-        }
-        if(scrollHost){
-          void scrollHost.scrollHeight;
-        }
-        if(card){
-          void card.offsetHeight;
-        }
-        if(pageContent){
-          void pageContent.scrollHeight;
-        }
-      });
-    }
-  })();
 
 };
 
