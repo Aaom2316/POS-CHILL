@@ -437,6 +437,10 @@ POS.inventoryRecipesData = [];
 POS.inventoryRecipesMenus = [];
 POS.inventoryRecipesIngredients = [];
 
+/* cache ข้อมูลสูตรไว้ใน session เดียวกัน เพื่อลดเวลาตอนกลับเข้าหน้า */
+POS.inventoryRecipesCache = null;
+POS.inventoryRecipesLoadPromise = null;
+
 
 /* =====================================================
    RECIPES : ESCAPE HTML
@@ -600,7 +604,7 @@ POS.inventoryRecipesMessage = function(
    RECIPES : LOAD
    ===================================================== */
 
-POS.inventoryRecipesLoad = async function(){
+POS.inventoryRecipesLoad = async function(forceReload){
 
   const body =
     document.getElementById(
@@ -609,6 +613,27 @@ POS.inventoryRecipesLoad = async function(){
 
   if(!body){
     return;
+  }
+
+  /* ถ้ามีข้อมูลอยู่แล้ว ให้แสดงทันที ไม่รอ API */
+  if(!forceReload && POS.inventoryRecipesCache){
+
+    POS.inventoryRecipesData =
+      POS.inventoryRecipesCache.recipes;
+
+    POS.inventoryRecipesMenus =
+      POS.inventoryRecipesCache.menus;
+
+    POS.inventoryRecipesIngredients =
+      POS.inventoryRecipesCache.ingredients;
+
+    POS.inventoryRecipesRender();
+    return;
+  }
+
+  /* ป้องกันการยิง recipesList ซ้ำพร้อมกัน */
+  if(!forceReload && POS.inventoryRecipesLoadPromise){
+    return POS.inventoryRecipesLoadPromise;
   }
 
   body.innerHTML = `
@@ -624,88 +649,102 @@ POS.inventoryRecipesLoad = async function(){
     </tr>
   `;
 
-  try{
+  const loadPromise = (async function(){
 
-    const result =
-      await POS.api.recipesList();
+    try{
 
-    if(
-      !result ||
-      result.success !== true
-    ){
-      throw new Error(
-        result?.error ||
-        result?.message ||
-        "ไม่สามารถโหลดข้อมูลสูตรได้"
+      const result =
+        await POS.api.recipesList();
+
+      if(
+        !result ||
+        result.success !== true
+      ){
+        throw new Error(
+          result?.error ||
+          result?.message ||
+          "ไม่สามารถโหลดข้อมูลสูตรได้"
+        );
+      }
+
+      const data =
+        result.data || {};
+
+      POS.inventoryRecipesData =
+        Array.isArray(data.recipes)
+          ? data.recipes
+          : [];
+
+      POS.inventoryRecipesMenus =
+        Array.isArray(data.menus)
+          ? data.menus
+          : [];
+
+      POS.inventoryRecipesIngredients =
+        Array.isArray(data.ingredients)
+          ? data.ingredients
+          : [];
+
+      POS.inventoryRecipesCache = {
+        recipes: POS.inventoryRecipesData,
+        menus: POS.inventoryRecipesMenus,
+        ingredients: POS.inventoryRecipesIngredients
+      };
+
+      POS.inventoryRecipesRender();
+
+    }catch(error){
+
+      console.error(
+        "inventoryRecipesLoad error:",
+        error
       );
+
+      body.innerHTML = `
+        <tr>
+          <td colspan="5"
+              style="
+                padding:55px 20px;
+                text-align:center;
+              ">
+
+            <div style="
+              font-size:28px;
+              margin-bottom:8px;
+            ">
+              ⚠️
+            </div>
+
+            <div style="
+              font-size:15px;
+              font-weight:800;
+              color:#64748b;
+            ">
+              โหลดข้อมูลสูตรไม่สำเร็จ
+            </div>
+
+            <div style="
+              margin-top:6px;
+              font-size:13px;
+              color:#94a3b8;
+            ">
+              ${POS.inventoryRecipesEscape(
+                error?.message ||
+                "กรุณาลองใหม่อีกครั้ง"
+              )}
+            </div>
+
+          </td>
+        </tr>
+      `;
+    }finally{
+      POS.inventoryRecipesLoadPromise = null;
     }
 
-    const data =
-      result.data || {};
+  })();
 
-    POS.inventoryRecipesData =
-      Array.isArray(data.recipes)
-        ? data.recipes
-        : [];
-
-    POS.inventoryRecipesMenus =
-      Array.isArray(data.menus)
-        ? data.menus
-        : [];
-
-    POS.inventoryRecipesIngredients =
-      Array.isArray(data.ingredients)
-        ? data.ingredients
-        : [];
-
-    POS.inventoryRecipesRender();
-
-  }catch(error){
-
-    console.error(
-      "inventoryRecipesLoad error:",
-      error
-    );
-
-    body.innerHTML = `
-      <tr>
-        <td colspan="5"
-            style="
-              padding:55px 20px;
-              text-align:center;
-            ">
-
-          <div style="
-            font-size:28px;
-            margin-bottom:8px;
-          ">
-            ⚠️
-          </div>
-
-          <div style="
-            font-size:15px;
-            font-weight:800;
-            color:#64748b;
-          ">
-            โหลดข้อมูลสูตรไม่สำเร็จ
-          </div>
-
-          <div style="
-            margin-top:6px;
-            font-size:13px;
-            color:#94a3b8;
-          ">
-            ${POS.inventoryRecipesEscape(
-              error?.message ||
-              "กรุณาลองใหม่อีกครั้ง"
-            )}
-          </div>
-
-        </td>
-      </tr>
-    `;
-  }
-
+  POS.inventoryRecipesLoadPromise = loadPromise;
+  return loadPromise;
 };
 
 
@@ -926,10 +965,14 @@ POS.inventoryRecipesRender = function(){
   }
 
 
-  body.innerHTML =
-    rows.map(function(group){
+  /*
+   * FAST FIRST PAINT
+   * สร้างแถวชุดแรกก่อน แล้วค่อยเติมแถวที่เหลือทีละชุด
+   * เพื่อไม่ให้ innerHTML ก้อนใหญ่บล็อกหน้า Recipes ตอนเปิด
+   */
+  const renderRecipeRow = function(group){
 
-      return `
+    return `
         <tr style="
           border-bottom:1px solid #eef1f4;
         ">
@@ -1012,7 +1055,60 @@ POS.inventoryRecipesRender = function(){
         </tr>
       `;
 
-    }).join("");
+  };
+
+  const renderRowsChunked = function(){
+
+    const CHUNK_SIZE = 40;
+    let index = 0;
+    let stopped = false;
+
+    body.innerHTML = "";
+
+    const appendChunk = function(){
+
+      if(stopped){
+        return;
+      }
+
+      const end = Math.min(
+        index + CHUNK_SIZE,
+        rows.length
+      );
+
+      let html = "";
+
+      for(; index < end; index++){
+        html += renderRecipeRow(rows[index]);
+      }
+
+      if(html){
+        body.insertAdjacentHTML("beforeend", html);
+      }
+
+      if(index < rows.length){
+        if(typeof requestAnimationFrame === "function"){
+          requestAnimationFrame(appendChunk);
+        }else{
+          setTimeout(appendChunk, 0);
+        }
+      }
+    };
+
+    appendChunk();
+
+    return function(){
+      stopped = true;
+    };
+  };
+
+  /* ยกเลิกงาน render ชุดเก่าก่อนเริ่มค้นหา/รีเฟรชใหม่ */
+  if(POS._inventoryRecipesStopRender){
+    POS._inventoryRecipesStopRender();
+    POS._inventoryRecipesStopRender = null;
+  }
+
+  POS._inventoryRecipesStopRender = renderRowsChunked();
 
 };
 
@@ -2667,7 +2763,7 @@ POS.inventoryRecipesInit = function(){
     refreshButton.onclick =
       function(){
 
-        POS.inventoryRecipesLoad();
+        POS.inventoryRecipesLoad(true);
 
       };
   }
