@@ -1017,7 +1017,7 @@ POS.inventoryRecipesRender = function(){
           ">
             <button
               type="button"
-              data-recipe-menu-id="${POS.inventoryRecipesEscape(group.menu_id)}"
+              onclick="POS.inventoryRecipesOpenManage('${String(group.menu_id).replace(/'/g,"\\'")}')"
               style="
                 min-height:36px;
                 padding:0 12px;
@@ -1037,6 +1037,60 @@ POS.inventoryRecipesRender = function(){
       `;
 
     }).join("");
+
+  /* =================================================
+     IPAD / SAFARI : POST-RENDER LAYOUT SETTLE
+
+     จุดสำคัญ: Refresh แล้วรายการแสดงครบเร็วขึ้น
+     แปลว่าปัญหาเกิดหลัง DOM ถูกสร้าง ไม่ใช่ API/JS
+     ให้ Safari คำนวณความสูงของ tbody/table/scroll host
+     หลังใส่ข้อมูลจริงทันที แทนที่จะปล่อยให้ค่อยๆ paint
+     ตามการ scroll
+     ================================================= */
+  (function(){
+    const table = body.closest("table");
+    const scrollHost = table ? table.parentElement : null;
+    const card = scrollHost ? scrollHost.parentElement : null;
+    const pageContent = document.getElementById("pageContent");
+
+    /* บังคับ layout รอบแรกทันทีหลัง innerHTML */
+    void body.offsetHeight;
+    if(table){
+      void table.offsetHeight;
+      void table.scrollHeight;
+    }
+    if(scrollHost){
+      void scrollHost.offsetHeight;
+      void scrollHost.scrollHeight;
+    }
+    if(card){
+      void card.offsetHeight;
+      void card.scrollHeight;
+    }
+    if(pageContent){
+      void pageContent.offsetHeight;
+      void pageContent.scrollHeight;
+    }
+
+    /* อีก 1 frame ให้ Safari commit paint ของตาราง */
+    if(typeof requestAnimationFrame === "function"){
+      requestAnimationFrame(function(){
+        void body.offsetHeight;
+        if(table){
+          void table.offsetHeight;
+        }
+        if(scrollHost){
+          void scrollHost.scrollHeight;
+        }
+        if(card){
+          void card.offsetHeight;
+        }
+        if(pageContent){
+          void pageContent.scrollHeight;
+        }
+      });
+    }
+  })();
 
 };
 
@@ -2706,29 +2760,6 @@ POS.inventoryRecipesInit = function(){
       };
   }
 
-
-  // ใช้ event delegation: มี handler เดียวแทน onclick ในทุกแถว
-  const tableBody =
-    document.getElementById(
-      "posInventoryRecipesTableBody"
-    );
-
-  if(tableBody && !tableBody.dataset.recipeClickBound){
-    tableBody.dataset.recipeClickBound = "1";
-
-    tableBody.addEventListener("click", function(event){
-      const button =
-        event.target.closest("button[data-recipe-menu-id]");
-
-      if(!button || !tableBody.contains(button)){
-        return;
-      }
-
-      POS.inventoryRecipesOpenManage(
-        button.getAttribute("data-recipe-menu-id") || ""
-      );
-    });
-  }
 
   // LOAD ถูกเรียกจาก page factory หลัง DOM ถูกสร้างแล้ว
   // ให้ INIT ทำหน้าที่ bind event เท่านั้น
