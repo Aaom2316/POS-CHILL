@@ -306,6 +306,8 @@ POS.pages.inventoryRecipes = async function(){
 
         <div style="
           overflow-x:auto;
+          overflow-y:hidden;
+          -webkit-overflow-scrolling:touch;
           border-top:1px solid #eef1f4;
         ">
 
@@ -791,15 +793,6 @@ POS.inventoryRecipesLoad = async function(){
       performance.now();
 
     POS.inventoryRecipesRender();
-
-    /*
-     * iPad / iPhone Safari FIX
-     * หลัง DOM ของตารางถูกแทนที่แบบ SPA ให้ Safari
-     * คำนวณ scroll geometry ใหม่โดยไม่แตะข้อมูล/API/CRUD
-     */
-    if(typeof POS.inventoryRecipesFixScroll === "function"){
-      POS.inventoryRecipesFixScroll();
-    }
 
     diagnostic.render =
       performance.now() - renderStart;
@@ -2786,118 +2779,8 @@ POS.inventoryRecipesDelete = async function(id){
 
 
 /* =====================================================
-   RECIPES : FIRST OPEN SCROLL / SAFARI FIX
-   ===================================================== */
-
-POS.inventoryRecipesFixScroll = function(){
-
-  const settle = function(){
-
-    const page =
-      document.querySelector(
-        ".inventory-subpage"
-      );
-
-    if(!page){
-      return;
-    }
-
-    const candidates = [];
-    let node = page;
-
-    /* หา scroll container ของหน้า Recipes เท่านั้น */
-    while(node && node !== document.body){
-      candidates.push(node);
-      node = node.parentElement;
-    }
-
-    if(document.scrollingElement){
-      candidates.push(
-        document.scrollingElement
-      );
-    }
-
-    candidates.push(
-      document.documentElement
-    );
-
-    const seen = new Set();
-    let scrollHost = null;
-
-    candidates.forEach(function(el){
-
-      if(!el || seen.has(el)){
-        return;
-      }
-
-      seen.add(el);
-
-      const style =
-        window.getComputedStyle(el);
-
-      const overflowY =
-        String(style.overflowY || "")
-          .toLowerCase();
-
-      const isScrollContainer =
-        overflowY === "auto" ||
-        overflowY === "scroll" ||
-        el === document.scrollingElement;
-
-      if(!isScrollContainer){
-        return;
-      }
-
-      if(!scrollHost){
-        scrollHost = el;
-      }
-
-      /* บังคับ Safari ให้คำนวณ layout/scroll geometry ใหม่ */
-      void el.offsetHeight;
-      void el.clientHeight;
-      void el.scrollHeight;
-    });
-
-    if(scrollHost){
-
-      const currentTop =
-        scrollHost.scrollTop;
-
-      /* อ่านก่อน แล้วเขียนค่าเดิมกลับ เพื่อกระตุ้น repaint
-         โดยไม่ย้ายตำแหน่งที่ผู้ใช้กำลังดู */
-      void scrollHost.scrollHeight;
-      scrollHost.scrollTop = currentTop;
-
-      scrollHost.style.webkitOverflowScrolling =
-        "touch";
-    }
-
-  };
-
-  /* รอให้ Safari commit DOM ก่อนคำนวณ geometry */
-  if(typeof requestAnimationFrame === "function"){
-
-    requestAnimationFrame(function(){
-
-      settle();
-
-      requestAnimationFrame(function(){
-        settle();
-      });
-
-    });
-
-  }else{
-    settle();
-  }
-
-};
-
-
-/* =====================================================
    RECIPES : INIT
-   =====================================================
-*/
+   ===================================================== */
 
 POS.inventoryRecipesInit = function(){
 
