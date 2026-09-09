@@ -7,6 +7,92 @@ POS.inventoryItemsData = [];
 POS.inventoryPurchaseUnitsData = [];
 
 /* =====================================================
+   FIRST LOAD CACHE / PREFETCH
+   เริ่มโหลดข้อมูลล่วงหน้าทันทีที่ API พร้อม
+   เพื่อให้การเปิดหน้า 01 ครั้งแรกไม่ต้องเริ่ม API ใหม่
+   และใช้ Promise เดิมถ้ากำลังโหลดอยู่
+   ===================================================== */
+POS.inventoryItemsPrefetchPromise = null;
+POS.inventoryItemsPrefetchReady = false;
+
+POS.inventoryItemsPrefetch = function(forceReload = false){
+
+  if(
+    !forceReload &&
+    POS.inventoryItemsPrefetchReady
+  ){
+    return Promise.resolve(true);
+  }
+
+  if(
+    !forceReload &&
+    POS.inventoryItemsPrefetchPromise
+  ){
+    return POS.inventoryItemsPrefetchPromise;
+  }
+
+  if(
+    !POS.api ||
+    typeof POS.api.ingredientsList !== "function" ||
+    typeof POS.api.purchaseUnitsList !== "function"
+  ){
+    return Promise.resolve(false);
+  }
+
+  const promise =
+    Promise.all([
+      POS.api.ingredientsList(),
+      POS.api.purchaseUnitsList()
+    ])
+    .then(function(results){
+
+      const ingredientResult = results[0];
+      const unitResult = results[1];
+
+      if(
+        !ingredientResult ||
+        ingredientResult.success !== true
+      ){
+        throw new Error(
+          ingredientResult?.error ||
+          ingredientResult?.message ||
+          "โหลดข้อมูลวัตถุดิบไม่สำเร็จ"
+        );
+      }
+
+      POS.inventoryItemsData =
+        Array.isArray(ingredientResult.data)
+          ? ingredientResult.data
+          : [];
+
+      POS.inventoryPurchaseUnitsData =
+        unitResult &&
+        unitResult.success === true &&
+        Array.isArray(unitResult.data)
+          ? unitResult.data
+          : [];
+
+      POS.inventoryItemsPrefetchReady = true;
+
+      return true;
+
+    })
+    .catch(function(error){
+
+      POS.inventoryItemsPrefetchPromise = null;
+      POS.inventoryItemsPrefetchReady = false;
+
+      throw error;
+
+    });
+
+  POS.inventoryItemsPrefetchPromise = promise;
+
+  return promise;
+
+};
+
+/* =====================================================
    STOCK PAGE 01 : INGREDIENTS
    ===================================================== */
 
@@ -261,7 +347,7 @@ POS.pages.inventoryItems = async function(){
           <button
             type="button"
             class="btn-secondary"
-            onclick="POS.inventoryItemsLoad()"
+            onclick="POS.inventoryItemsLoad(true)"
             style="
               white-space:nowrap;
               padding:11px 15px;
@@ -1279,7 +1365,7 @@ POS.inventoryItemsSave = async function(){
 
     POS.inventoryItemsCloseModal();
 
-    await POS.inventoryItemsLoad();
+    await POS.inventoryItemsLoad(true);
 
     if(isEdit){
 
@@ -1340,7 +1426,7 @@ POS.inventoryItemsSave = async function(){
    LOAD
    ===================================================== */
 
-POS.inventoryItemsLoad = async function(){
+POS.inventoryItemsLoad = async function(forceReload = false){
 
   const body =
     document.getElementById(
@@ -1370,65 +1456,68 @@ POS.inventoryItemsLoad = async function(){
 
   try{
 
-    const result =
-      await POS.api.ingredientsList();
+    /*
+      ใช้ข้อมูลที่ prefetch ไว้ตั้งแต่ก่อนเปิดหน้า 01
+      ถ้ายังโหลดไม่เสร็จ ให้รอ Promise เดิม
+      จึงไม่ยิง API ชุดที่สองซ้ำเมื่อผู้ใช้เพิ่งเปิดหน้า
+    */
+    if(forceReload){
+      POS.inventoryItemsPrefetchPromise = null;
+      POS.inventoryItemsPrefetchReady = false;
+    }
 
+    let prefetched = false;
 
     if(
-      !result ||
-      result.success !== true
+      POS.inventoryItemsPrefetchPromise ||
+      POS.inventoryItemsPrefetchReady
     ){
+      prefetched =
+        await POS.inventoryItemsPrefetch(forceReload);
+    }else{
+      prefetched =
+        await POS.inventoryItemsPrefetch(false);
+    }
+
+    if(!prefetched){
       throw new Error(
-        result?.error ||
-        result?.message ||
-        "โหลดข้อมูลวัตถุดิบไม่สำเร็จ"
+        "ระบบกำลังเตรียมการเชื่อมต่อฐานข้อมูล กรุณาลองใหม่อีกครั้ง"
       );
     }
 
-
-    POS.inventoryItemsData =
-      Array.isArray(result.data)
-        ? result.data
-        : [];
-
-
-    // โหลดหน่วยซื้อสำหรับใช้แสดงสต็อกเป็นหน่วยที่อ่านง่าย
-    // ถ้าโหลดหน่วยซื้อไม่ได้ ให้หน้าสต็อกยังทำงานและแสดงหน่วยหลักตามเดิม
-    try{
-
-      const unitResult =
-        await POS.api.purchaseUnitsList();
-
-      POS.inventoryPurchaseUnitsData =
-        unitResult && unitResult.success === true && Array.isArray(unitResult.data)
-          ? unitResult.data
-          : [];
-
-    }catch(unitError){
-
-      console.warn(
-        "โหลดหน่วยซื้อสำหรับแสดงสต็อกไม่สำเร็จ:",
-        unitError
-      );
-
-      POS.inventoryPurchaseUnitsData = [];
-
-    }
-
-
+    /*
+      ข้อมูลวัตถุดิบ + หน่วยซื้อพร้อมแล้ว
+      render ครั้งเดียวหลัง DOM ของหน้า 01 ถูกสร้าง
+      ลดการเปลี่ยนความสูงของตารางระหว่างที่ผู้ใช้เริ่มเลื่อน
+    */
     POS.inventoryItemsRender();
 
-    // บังคับให้ browser คำนวณ layout ใหม่หลังเติมรายการ
-    // แก้ปัญหา scroll เพี้ยนเฉพาะครั้งแรกหลังเปิดหน้า 01
-    requestAnimationFrame(function(){
+
+    /*
+      ให้ browser คำนวณ layout หลัง DOM ตารางถูกเติมแล้ว
+      แก้เฉพาะจังหวะ initial render ของ Page 01
+    */
+    if(typeof requestAnimationFrame === "function"){
+
       requestAnimationFrame(function(){
-        const page = document.querySelector(".inventory-subpage");
-        if(page){
-          void page.offsetHeight;
-        }
-        window.dispatchEvent(new Event("resize"));
+
+        requestAnimationFrame(function(){
+
+          const page =
+            document.querySelector(".inventory-subpage");
+
+          if(page){
+
+            void page.offsetHeight;
+            window.dispatchEvent(new Event("resize"));
+
+          }
+
+        });
+
       });
-    });
+
+    }
 
   }catch(error){
 
@@ -1960,11 +2049,6 @@ POS.inventoryItemsRender = function(){
 
     }).join("");
 
-  // ให้ตารางและความสูงของหน้า settle ก่อนการ scroll
-  requestAnimationFrame(function(){
-    void body.offsetHeight;
-  });
-
 };
 
 
@@ -2134,7 +2218,7 @@ POS.inventoryItemsDelete = async function(id){
     }
 
 
-    await POS.inventoryItemsLoad();
+    await POS.inventoryItemsLoad(true);
 
     POS.inventoryItemsShowSuccess({
       title:"ลบวัตถุดิบเรียบร้อย",
@@ -2156,6 +2240,53 @@ POS.inventoryItemsDelete = async function(id){
   }
 
 };
+
+
+/* =====================================================
+   START PREFETCH
+   เริ่มโหลดข้อมูลล่วงหน้าโดยไม่รบกวนหน้าอื่น
+   ถ้า API ยังไม่พร้อม จะลองใหม่ช่วงสั้น ๆ
+   ===================================================== */
+(function(){
+
+  let attempts = 0;
+  const maxAttempts = 10;
+
+  const start = function(){
+
+    if(
+      POS.inventoryItemsPrefetchReady ||
+      POS.inventoryItemsPrefetchPromise
+    ){
+      return;
+    }
+
+    if(
+      POS.api &&
+      typeof POS.api.ingredientsList === "function" &&
+      typeof POS.api.purchaseUnitsList === "function"
+    ){
+      POS.inventoryItemsPrefetch(false)
+        .catch(function(error){
+          console.warn(
+            "เตรียมข้อมูลวัตถุดิบล่วงหน้าไม่สำเร็จ:",
+            error
+          );
+        });
+      return;
+    }
+
+    attempts++;
+
+    if(attempts < maxAttempts){
+      setTimeout(start, 100);
+    }
+
+  };
+
+  setTimeout(start, 0);
+
+})();
 
 
 /* =====================================================
