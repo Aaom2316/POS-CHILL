@@ -1569,136 +1569,83 @@ POS.inventoryItemsLoad = async function(forceReload = false){
 
 /* =====================================================
    FIRST OPEN SCROLL FIX
-   บังคับให้ scroll container คำนวณความสูงใหม่หลัง
-   Page 01 ถูกสร้างแบบ SPA โดยไม่ต้องกด Refresh
+   ใช้ #pageContent เป็น scroll host ตัวจริงของระบบ
+   แก้กรณี SPA เปิดครั้งแรกแล้ว scroll range ยังไม่พร้อม
    ===================================================== */
 POS.inventoryItemsFixScroll = function(){
 
+  const page = document.querySelector(".inventory-subpage");
+  if(!page) return;
+
+  /* ระบบหลักของ POS ใช้ #pageContent เป็นพื้นที่เลื่อนแนวตั้ง */
+  const host = document.getElementById("pageContent");
+  if(!host) return;
+
+  /* Page 01 ห้ามสร้าง vertical scroll ซ้อน */
+  page.style.height = "auto";
+  page.style.minHeight = "max-content";
+  page.style.overflow = "visible";
+
+  /*
+     สำคัญ: render ตารางเสร็จแล้ว แต่ browser อาจยังถือ layout
+     ของ DOM ก่อนเปลี่ยนหน้าอยู่ จึงบังคับ reflow ที่ scroll host
+     ตัวจริง ไม่ใช่ body หรือ inventory-subpage
+  */
+  void page.offsetHeight;
+  void page.scrollHeight;
+  void host.offsetHeight;
+  void host.scrollHeight;
+
+  const currentTop = host.scrollTop;
+
+  host.style.overflowY = "auto";
+  host.style.webkitOverflowScrolling = "touch";
+
+  void host.offsetHeight;
+  void host.scrollHeight;
+  host.scrollTop = currentTop;
+
+  /*
+     รอจน scrollHeight ของ #pageContent คงที่จริง ๆ
+     ไม่ใช้ timeout เดาสุ่ม เพราะข้อมูล/ฟอนต์/layout อาจเสร็จต่างเวลา
+  */
+  let lastHeight = -1;
+  let stableFrames = 0;
+  let frameCount = 0;
+
   const settle = function(){
 
-    const page =
-      document.querySelector(".inventory-subpage");
+    if(!document.body.contains(page)) return;
 
-    if(!page){
+    void page.offsetHeight;
+    void host.offsetHeight;
+
+    const height = host.scrollHeight;
+
+    if(height === lastHeight){
+      stableFrames++;
+    }else{
+      lastHeight = height;
+      stableFrames = 0;
+    }
+
+    frameCount++;
+
+    /* คงที่ 2 frame ติดต่อกัน = scroll geometry พร้อม */
+    if(stableFrames >= 2 || frameCount >= 30){
+      void host.scrollHeight;
+      host.scrollTop = currentTop;
       return;
     }
 
-    const candidates = [];
-    let node = page;
-
-    while(node && node !== document.body){
-      candidates.push(node);
-      node = node.parentElement;
-    }
-
-    if(document.scrollingElement){
-      candidates.push(document.scrollingElement);
-    }
-
-    candidates.push(document.documentElement);
-
-    const seen = new Set();
-
-    candidates.forEach(function(el){
-
-      if(!el || seen.has(el)){
-        return;
-      }
-
-      seen.add(el);
-
-      const style =
-        window.getComputedStyle(el);
-
-      const overflowY =
-        String(style.overflowY || "").toLowerCase();
-
-      const isScrollContainer =
-        overflowY === "auto" ||
-        overflowY === "scroll" ||
-        el === document.scrollingElement;
-
-      if(!isScrollContainer){
-        return;
-      }
-
-      /* บังคับ layout calculation */
-      void el.offsetHeight;
-      void el.scrollHeight;
-      void el.clientHeight;
-
-      /*
-        Safari/iOS บางครั้งค้าง scroll geometry ของ
-        fixed/SPA container จาก frame ก่อนหน้า
-      */
-      const originalOverflowY =
-        el.style.overflowY;
-
-      el.style.overflowY = "hidden";
-      void el.offsetHeight;
-      void el.scrollHeight;
-      el.style.overflowY =
-        originalOverflowY || "auto";
-
-      /* ให้ iOS ใช้ touch scrolling กับ container เดิม */
-      el.style.webkitOverflowScrolling = "touch";
-
-      void el.offsetHeight;
-      void el.scrollHeight;
-    });
-
-    window.dispatchEvent(
-      new Event("resize")
-    );
-
-    /* สะกิด scroll geometry โดยไม่เปลี่ยนตำแหน่งผู้ใช้ */
-    const scrollHost =
-      candidates.find(function(el){
-
-        if(!el){
-          return false;
-        }
-
-        if(el === document.scrollingElement){
-          return true;
-        }
-
-        const style =
-          window.getComputedStyle(el);
-
-        return (
-          style.overflowY === "auto" ||
-          style.overflowY === "scroll"
-        );
-      });
-
-    if(scrollHost){
-      const currentTop =
-        scrollHost.scrollTop;
-
-      void scrollHost.scrollHeight;
-      scrollHost.scrollTop = currentTop;
-    }
+    requestAnimationFrame(settle);
   };
 
   if(typeof requestAnimationFrame === "function"){
-
-    requestAnimationFrame(function(){
-      settle();
-
-      requestAnimationFrame(function(){
-        settle();
-      });
-    });
-
+    requestAnimationFrame(settle);
   }else{
-    settle();
+    void host.scrollHeight;
   }
-
-  /* มือถือบางเครื่องเปลี่ยน viewport หลัง frame แรก */
-  setTimeout(settle, 120);
-  setTimeout(settle, 350);
-  setTimeout(settle, 700);
 };
 
 
