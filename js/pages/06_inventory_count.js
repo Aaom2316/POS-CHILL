@@ -2344,7 +2344,6 @@ POS.inventoryCountSave = async function(){
      * กันการผูก event ซ้ำ หากเปิดหน้าเดิมหลายครั้ง
      */
     if(body.dataset.stockCountEventsBound === "1"){
-      POS.inventoryCountLoad();
       return;
     }
 
