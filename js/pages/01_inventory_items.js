@@ -119,8 +119,12 @@ POS.pages.inventoryItems = async function(){
       typeof POS.api.purchaseUnitsList === "function" &&
       typeof POS.inventoryItemsPrefetch === "function"
     ){
-      /* เปิด Page 01 = โหลดใหม่เหมือนกด Refresh */
-      await POS.inventoryItemsPrefetch(true);
+      /*
+         ไม่โหลดข้อมูลตรงนี้
+         ให้การกดแท็บทำงานผ่าน AUTO LOAD ด้านล่าง
+         ซึ่งจะเรียก inventoryItemsLoad(true)
+         = กระบวนการเดียวกับปุ่ม "รีเฟรช" โดยตรง
+      */
     }
 
   }catch(error){
@@ -2475,8 +2479,13 @@ POS.inventoryItemsDelete = async function(id){
 
     loadingTableBody = tableBody;
 
+    /*
+       เปิดแท็บวัตถุดิบ = ทำเหมือนกดปุ่ม "รีเฟรช"
+       ใช้ true เพื่อบังคับโหลดข้อมูลใหม่ชุดเดียวกับ
+       onclick="POS.inventoryItemsLoad(true)"
+    */
     Promise.resolve(
-      POS.inventoryItemsLoad()
+      POS.inventoryItemsLoad(true)
     )
     .catch(function(error){
 
