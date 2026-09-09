@@ -1017,7 +1017,7 @@ POS.inventoryRecipesRender = function(){
           ">
             <button
               type="button"
-              onclick="POS.inventoryRecipesOpenManage('${String(group.menu_id).replace(/'/g,"\\'")}')"
+              data-recipe-menu-id="${POS.inventoryRecipesEscape(group.menu_id)}"
               style="
                 min-height:36px;
                 padding:0 12px;
@@ -2706,6 +2706,29 @@ POS.inventoryRecipesInit = function(){
       };
   }
 
+
+  // ใช้ event delegation: มี handler เดียวแทน onclick ในทุกแถว
+  const tableBody =
+    document.getElementById(
+      "posInventoryRecipesTableBody"
+    );
+
+  if(tableBody && !tableBody.dataset.recipeClickBound){
+    tableBody.dataset.recipeClickBound = "1";
+
+    tableBody.addEventListener("click", function(event){
+      const button =
+        event.target.closest("button[data-recipe-menu-id]");
+
+      if(!button || !tableBody.contains(button)){
+        return;
+      }
+
+      POS.inventoryRecipesOpenManage(
+        button.getAttribute("data-recipe-menu-id") || ""
+      );
+    });
+  }
 
   // LOAD ถูกเรียกจาก page factory หลัง DOM ถูกสร้างแล้ว
   // ให้ INIT ทำหน้าที่ bind event เท่านั้น
