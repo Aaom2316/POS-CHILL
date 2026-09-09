@@ -103,10 +103,12 @@ POS.pages.inventoryRecipes = async function(){
         margin-bottom:20px;
       ">
 
-        <div class="card" style="
-          margin:0;
-          min-height:108px;
-          box-sizing:border-box;
+        <div style="
+          background:#fff;
+          border:1px solid #e5e7eb;
+          border-radius:14px;
+          padding:18px;
+          box-shadow:0 2px 8px rgba(15,23,42,.04);
         ">
           <div style="
             color:#94a3b8;
@@ -135,10 +137,12 @@ POS.pages.inventoryRecipes = async function(){
         </div>
 
 
-        <div class="card" style="
-          margin:0;
-          min-height:108px;
-          box-sizing:border-box;
+        <div style="
+          background:#fff;
+          border:1px solid #e5e7eb;
+          border-radius:14px;
+          padding:18px;
+          box-shadow:0 2px 8px rgba(15,23,42,.04);
         ">
           <div style="
             color:#94a3b8;
@@ -167,10 +171,12 @@ POS.pages.inventoryRecipes = async function(){
         </div>
 
 
-        <div class="card" style="
-          margin:0;
-          min-height:108px;
-          box-sizing:border-box;
+        <div style="
+          background:#fff;
+          border:1px solid #e5e7eb;
+          border-radius:14px;
+          padding:18px;
+          box-shadow:0 2px 8px rgba(15,23,42,.04);
         ">
           <div style="
             color:#94a3b8;
