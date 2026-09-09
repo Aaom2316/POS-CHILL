@@ -1370,8 +1370,20 @@ POS.inventoryItemsLoad = async function(){
 
   try{
 
+    /*
+      โหลด 2 API พร้อมกัน
+      เดิม ingredientsList -> รอเสร็จ -> purchaseUnitsList
+      ทำให้เวลารวมเกือบ 1 วินาที และหน้าเหมือนโหลดไม่ทัน
+    */
+    const ingredientsPromise =
+      POS.api.ingredientsList();
+
+    const purchaseUnitsPromise =
+      POS.api.purchaseUnitsList();
+
+
     const result =
-      await POS.api.ingredientsList();
+      await ingredientsPromise;
 
 
     if(
@@ -1392,12 +1404,24 @@ POS.inventoryItemsLoad = async function(){
         : [];
 
 
-    // โหลดหน่วยซื้อสำหรับใช้แสดงสต็อกเป็นหน่วยที่อ่านง่าย
-    // ถ้าโหลดหน่วยซื้อไม่ได้ ให้หน้าสต็อกยังทำงานและแสดงหน่วยหลักตามเดิม
+    /*
+      แสดงรายการวัตถุดิบทันทีที่ ingredientsList เสร็จ
+      ไม่ต้องรอ purchaseUnitsList ก่อน
+      เพื่อไม่ให้หน้าแรกว่างนานและลดอาการ scroll/layout กระโดด
+    */
+    POS.inventoryPurchaseUnitsData = [];
+
+    POS.inventoryItemsRender();
+
+
+    /*
+      รอหน่วยซื้อที่กำลังโหลดคู่ขนานอยู่
+      แล้ว render อีกครั้งเพื่ออัปเดตการแสดงหน่วยสต็อก
+    */
     try{
 
       const unitResult =
-        await POS.api.purchaseUnitsList();
+        await purchaseUnitsPromise;
 
       POS.inventoryPurchaseUnitsData =
         unitResult && unitResult.success === true && Array.isArray(unitResult.data)
@@ -1418,17 +1442,31 @@ POS.inventoryItemsLoad = async function(){
 
     POS.inventoryItemsRender();
 
-    // บังคับให้ browser คำนวณ layout ใหม่หลังเติมรายการ
-    // แก้ปัญหา scroll เพี้ยนเฉพาะครั้งแรกหลังเปิดหน้า 01
-    requestAnimationFrame(function(){
+
+    /*
+      ให้ browser คำนวณ layout หลัง DOM ตารางถูกเติมแล้ว
+      แก้เฉพาะจังหวะ initial render ของ Page 01
+    */
+    if(typeof requestAnimationFrame === "function"){
+
       requestAnimationFrame(function(){
-        const page = document.querySelector(".inventory-subpage");
-        if(page){
-          void page.offsetHeight;
-        }
-        window.dispatchEvent(new Event("resize"));
+
+        requestAnimationFrame(function(){
+
+          const page =
+            document.querySelector(".inventory-subpage");
+
+          if(page){
+
+            void page.offsetHeight;
+
+          }
+
+        });
+
       });
-    });
+
+    }
 
   }catch(error){
 
@@ -1959,11 +1997,6 @@ POS.inventoryItemsRender = function(){
       `;
 
     }).join("");
-
-  // ให้ตารางและความสูงของหน้า settle ก่อนการ scroll
-  requestAnimationFrame(function(){
-    void body.offsetHeight;
-  });
 
 };
 
