@@ -304,8 +304,10 @@ POS.pages.inventoryRecipes = async function(){
         </div>
 
 
-        <div style="
+        <div class="pos-recipes-table-scroll" style="
           overflow-x:auto;
+          overflow-y:hidden;
+          -webkit-overflow-scrolling:touch;
           border-top:1px solid #eef1f4;
         ">
 
@@ -313,6 +315,7 @@ POS.pages.inventoryRecipes = async function(){
             width:100%;
             min-width:900px;
             border-collapse:collapse;
+            table-layout:fixed;
           ">
 
             <thead>
