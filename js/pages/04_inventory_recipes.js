@@ -6,7 +6,7 @@ POS.pages = POS.pages || {};
    ===================================================== */
 
 POS.pages.inventoryRecipes = async function(){
-  const html = `
+  return `
     <div class="inventory-subpage">
 
       <!-- =================================================
@@ -426,14 +426,6 @@ POS.pages.inventoryRecipes = async function(){
 
     </div>
   `;
-
-  setTimeout(function(){
-    if(typeof POS.inventoryRecipesInit === "function"){
-      POS.inventoryRecipesInit();
-    }
-  }, 0);
-
-  return html;
 };
 
 
@@ -2694,3 +2686,82 @@ POS.inventoryRecipesInit = function(){
   POS.inventoryRecipesLoad();
 
 };
+
+
+/* =====================================================
+   RECIPES : AUTO INIT
+   ===================================================== */
+
+/*
+ * หน้า Recipes ถูกสร้างแบบ Dynamic
+ *
+ * ใช้ MutationObserver เพื่อจับตอนที่หน้า Recipes
+ * ถูกสร้าง/เปิดจริงทุกครั้ง
+ *
+ * จุดนี้แก้เฉพาะปัญหา:
+ * "ต้องรีโหลดหน้า ถึงข้อมูลสูตรจะขึ้น"
+ *
+ * ไม่แตะ LOAD / API / MODAL / CRUD ส่วนอื่น
+ */
+
+(function initRecipesWhenReady(){
+
+  let initializedTableBody = null;
+
+  function tryInit(){
+
+    const tableBody =
+      document.getElementById(
+        "posInventoryRecipesTableBody"
+      );
+
+    if(!tableBody){
+      return;
+    }
+
+    /*
+     * INIT เฉพาะเมื่อเป็น DOM ของหน้า Recipes
+     * ที่เพิ่งถูกสร้างใหม่
+     */
+    if(initializedTableBody === tableBody){
+      return;
+    }
+
+    initializedTableBody = tableBody;
+
+    POS.inventoryRecipesInit();
+
+  }
+
+
+  /*
+   * กรณีหน้า Recipes มีอยู่แล้วตอน JS ถูกโหลด
+   */
+  tryInit();
+
+
+  /*
+   * กรณีผู้ใช้กดเข้าหน้า Recipes ภายหลัง
+   * ซึ่ง DOM ถูกสร้างแบบ Dynamic
+   */
+  const observer =
+    new MutationObserver(function(){
+
+      tryInit();
+
+    });
+
+
+  if(document.body){
+
+    observer.observe(
+      document.body,
+      {
+        childList:true,
+        subtree:true
+      }
+    );
+
+  }
+
+})();

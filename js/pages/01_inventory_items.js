@@ -12,7 +12,7 @@ POS.inventoryPurchaseUnitsData = [];
 
 POS.pages.inventoryItems = async function(){
 
-  const html = `
+  return `
     <div class="inventory-subpage">
 
       <!-- =================================================
@@ -590,14 +590,6 @@ POS.pages.inventoryItems = async function(){
 
     </div>
   `;
-
-  setTimeout(function(){
-    if(typeof POS.inventoryItemsLoad === "function"){
-      POS.inventoryItemsLoad();
-    }
-  }, 0);
-
-  return html;
 };
 
 
@@ -1378,17 +1370,8 @@ POS.inventoryItemsLoad = async function(){
 
   try{
 
-    const [result, unitResult] =
-      await Promise.all([
-        POS.api.ingredientsList(),
-        POS.api.purchaseUnitsList().catch(function(unitError){
-          console.warn(
-            "โหลดหน่วยซื้อสำหรับแสดงสต็อกไม่สำเร็จ:",
-            unitError
-          );
-          return null;
-        })
-      ]);
+    const result =
+      await POS.api.ingredientsList();
 
 
     if(
@@ -1398,7 +1381,7 @@ POS.inventoryItemsLoad = async function(){
       throw new Error(
         result?.error ||
         result?.message ||
-        "โหลดวัตถุดิบไม่สำเร็จ"
+        "โหลดข้อมูลวัตถุดิบไม่สำเร็จ"
       );
     }
 
@@ -1409,15 +1392,28 @@ POS.inventoryItemsLoad = async function(){
         : [];
 
 
-    POS.inventoryPurchaseUnitsData =
-      unitResult &&
-      unitResult.success === true &&
-      Array.isArray(unitResult.data)
-        ? unitResult.data
-        : [];
+    // โหลดหน่วยซื้อสำหรับใช้แสดงสต็อกเป็นหน่วยที่อ่านง่าย
+    // ถ้าโหลดหน่วยซื้อไม่ได้ ให้หน้าสต็อกยังทำงานและแสดงหน่วยหลักตามเดิม
+    try{
 
+      const unitResult =
+        await POS.api.purchaseUnitsList();
 
-    POS.inventoryItemsBuildUnitsIndex();
+      POS.inventoryPurchaseUnitsData =
+        unitResult && unitResult.success === true && Array.isArray(unitResult.data)
+          ? unitResult.data
+          : [];
+
+    }catch(unitError){
+
+      console.warn(
+        "โหลดหน่วยซื้อสำหรับแสดงสต็อกไม่สำเร็จ:",
+        unitError
+      );
+
+      POS.inventoryPurchaseUnitsData = [];
+
+    }
 
 
     POS.inventoryItemsRender();
@@ -1461,50 +1457,6 @@ POS.inventoryItemsLoad = async function(){
    ไม่ใช้หน่วยกลาง เช่น แพ็ค6 / ลัง12
    ===================================================== */
 
-POS.inventoryItemsUnitsByIngredient = Object.create(null);
-
-POS.inventoryItemsBuildUnitsIndex = function(){
-
-  const allUnits = Array.isArray(POS.inventoryPurchaseUnitsData)
-    ? POS.inventoryPurchaseUnitsData
-    : [];
-
-  const index = Object.create(null);
-
-  allUnits.forEach(function(unit){
-
-    if(!unit) return;
-
-    if(unit.active === false) return;
-
-    const ingredientId = String(unit.ingredient_id || "");
-    if(!ingredientId) return;
-
-    const multiple = Number(unit.multiple ?? 0);
-    const name = String(unit.unit_name || "").trim();
-
-    if(!Number.isFinite(multiple) || multiple <= 0 || !name){
-      return;
-    }
-
-    (index[ingredientId] ||= []).push({
-      name:name,
-      multiple:multiple
-    });
-
-  });
-
-  Object.keys(index).forEach(function(key){
-    index[key].sort(function(a,b){
-      return a.multiple - b.multiple;
-    });
-  });
-
-  POS.inventoryItemsUnitsByIngredient = index;
-
-};
-
-
 POS.inventoryItemsFormatStock = function(item){
 
   const stock = Number(item?.stock ?? 0);
@@ -1521,15 +1473,46 @@ POS.inventoryItemsFormatStock = function(item){
   const ingredientId = String(item?.id || "");
 
   const units =
-    POS.inventoryItemsUnitsByIngredient?.[ingredientId] || [];
+    (Array.isArray(POS.inventoryPurchaseUnitsData)
+      ? POS.inventoryPurchaseUnitsData
+      : [])
+      .filter(function(unit){
+
+        if(String(unit?.ingredient_id || "") !== ingredientId){
+          return false;
+        }
+
+        if(unit?.active === false){
+          return false;
+        }
+
+        const multiple = Number(unit?.multiple ?? 0);
+
+        return Number.isFinite(multiple) && multiple > 0 &&
+          String(unit?.unit_name || "").trim() !== "";
+
+      })
+      .map(function(unit){
+        return {
+          name: String(unit.unit_name).trim(),
+          multiple: Number(unit.multiple)
+        };
+      });
 
   if(!units.length){
     return stock.toLocaleString("th-TH") + " " + baseUnit;
   }
 
+  // หน่วยใหญ่สุด = multiple มากที่สุด
+  // หน่วยเล็กสุด = multiple น้อยที่สุด
+  units.sort(function(a,b){
+    return a.multiple - b.multiple;
+  });
+
   const smallest = units[0];
   const largest = units[units.length - 1];
 
+  // ถ้ามีเพียงหน่วยเดียว ใช้หน่วยนั้นได้เลย
   if(largest.multiple === smallest.multiple){
 
     const qty = stock / smallest.multiple;
@@ -1544,25 +1527,35 @@ POS.inventoryItemsFormatStock = function(item){
   const largeQty = Math.floor(stock / largest.multiple);
   const remainder = stock - (largeQty * largest.multiple);
 
-  if(remainder <= 0){
-    return largeQty.toLocaleString("th-TH") + " " + largest.name;
-  }
+  // แสดงหน่วยเล็กสุดเฉพาะส่วนที่เหลือ
+  const smallQty = Math.floor(remainder / smallest.multiple);
+  const finalRemainder = remainder - (smallQty * smallest.multiple);
 
-  const smallQty = remainder / smallest.multiple;
+  const parts = [];
 
-  if(Number.isInteger(smallQty)){
-    return (
-      largeQty.toLocaleString("th-TH") +
-      " " +
-      largest.name +
-      " + " +
-      smallQty.toLocaleString("th-TH") +
-      " " +
-      smallest.name
+  if(largeQty > 0){
+    parts.push(
+      largeQty.toLocaleString("th-TH") + " " + largest.name
     );
   }
 
-  return stock.toLocaleString("th-TH") + " " + baseUnit;
+  if(smallQty > 0){
+    parts.push(
+      smallQty.toLocaleString("th-TH") + " " + smallest.name
+    );
+  }
+
+  // กรณีสต็อกมีเศษที่ไม่สามารถแปลงเป็นหน่วยซื้อเล็กสุดได้
+  if(Math.abs(finalRemainder) > 0.0000001){
+    parts.push(
+      finalRemainder.toLocaleString("th-TH") + " " + baseUnit
+    );
+  }
+
+  return parts.length
+    ? parts.join(" + ")
+    : "0 " + smallest.name;
+
 };
 
 
@@ -2146,3 +2139,99 @@ POS.inventoryItemsDelete = async function(id){
   }
 
 };
+
+
+/* =====================================================
+   AUTO LOAD
+   โหลดทุกครั้งที่หน้า 01 ถูกสร้างใหม่
+   ไม่ต้องกดปุ่ม "รีเฟรช"
+   ===================================================== */
+
+(function(){
+
+  // จำ DOM ของตารางที่โหลดไปแล้ว
+  // เมื่อ Router สร้างหน้า 01 ใหม่ tableBody จะเป็นคนละตัว
+  let lastLoadedTableBody = null;
+  let loadingTableBody = null;
+
+  const loadWhenReady = function(){
+
+    const tableBody =
+      document.getElementById(
+        "inventoryItemsTableBody"
+      );
+
+    if(!tableBody){
+      return;
+    }
+
+    // DOM เดิมโหลดแล้ว ไม่ต้องโหลดซ้ำ
+    if(
+      tableBody === lastLoadedTableBody ||
+      tableBody === loadingTableBody
+    ){
+      return;
+    }
+
+    loadingTableBody = tableBody;
+
+    Promise.resolve(
+      POS.inventoryItemsLoad()
+    )
+    .catch(function(error){
+
+      console.error(
+        "โหลดวัตถุดิบอัตโนมัติไม่สำเร็จ:",
+        error
+      );
+
+    })
+    .finally(function(){
+
+      // ห้าม disconnect observer
+      // เพราะหน้า 01 สามารถถูกเปิดใหม่ได้หลายครั้ง
+      if(loadingTableBody === tableBody){
+
+        lastLoadedTableBody = tableBody;
+        loadingTableBody = null;
+
+      }
+
+    });
+
+  };
+
+
+  // ---------------------------------------------------------
+  // Observer ทำงานต่อเนื่อง
+  // รองรับการเข้า/ออกหน้า 01 ได้ทุกครั้ง
+  // ---------------------------------------------------------
+
+  if(document.body){
+
+    const observer =
+      new MutationObserver(function(){
+
+        loadWhenReady();
+
+      });
+
+    observer.observe(
+      document.body,
+      {
+        childList:true,
+        subtree:true
+      }
+    );
+
+  }
+
+
+  // ---------------------------------------------------------
+  // กรณีหน้า 01 มีอยู่แล้วใน DOM ตอน JS ถูกโหลด
+  // ---------------------------------------------------------
+
+  loadWhenReady();
+
+})();
+
