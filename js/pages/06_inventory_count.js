@@ -420,17 +420,6 @@ POS.pages.inventoryCount = async function(){
     </div>
   `;
 
-  /*
-   * เมื่อเปิดหน้า ตรวจนับจากเมนู โดยไฟล์ JS ถูกโหลดมาก่อนแล้ว
-   * ให้เรียก init หลัง DOM ของหน้านี้ถูกใส่เข้าหน้าเว็บแล้ว
-   * เพื่อโหลดข้อมูลทันทีโดยไม่ต้องกดรีโหลดหน้าเว็บ
-   */
-  setTimeout(function(){
-    if(typeof POS.inventoryCountInit === "function"){
-      POS.inventoryCountInit();
-    }
-  }, 0);
-
   return html;
 };
 
