@@ -6,6 +6,17 @@ POS.pages = POS.pages || {};
    ===================================================== */
 
 POS.pages.inventoryRecipes = async function(){
+
+  /*
+   * ให้ทำงานแบบเดียวกับ Stock Page 05 : Movement
+   * คืน HTML ให้ Router สร้าง DOM ก่อน แล้วค่อย INIT/LOAD
+   */
+  setTimeout(function(){
+    if(typeof POS.inventoryRecipesInit === "function"){
+      POS.inventoryRecipesInit();
+    }
+  }, 0);
+
   return `
     <div class="inventory-subpage">
 
@@ -2705,75 +2716,12 @@ POS.inventoryRecipesInit = function(){
    ===================================================== */
 
 /*
- * หน้า Recipes ถูกสร้างแบบ Dynamic
+ * ไม่ใช้ MutationObserver สำหรับการเปิดหน้า Recipes แล้ว
  *
- * ใช้ MutationObserver เพื่อจับตอนที่หน้า Recipes
- * ถูกสร้าง/เปิดจริงทุกครั้ง
+ * Recipes ใช้ lifecycle แบบเดียวกับ Stock Page 05 : Movement
+ * คือ page factory คืน HTML ก่อน แล้ว setTimeout(..., 0)
+ * จึงค่อยเรียก inventoryRecipesInit() หลัง DOM ถูกสร้าง
+ * และ inventoryRecipesInit() จะ LOAD ข้อมูลตามเดิม
  *
- * จุดนี้แก้เฉพาะปัญหา:
- * "ต้องรีโหลดหน้า ถึงข้อมูลสูตรจะขึ้น"
- *
- * ไม่แตะ LOAD / API / MODAL / CRUD ส่วนอื่น
+ * ไม่แตะ LOAD / API / MODAL / CRUD / SEARCH / REFRESH
  */
-
-(function initRecipesWhenReady(){
-
-  let initializedTableBody = null;
-
-  function tryInit(){
-
-    const tableBody =
-      document.getElementById(
-        "posInventoryRecipesTableBody"
-      );
-
-    if(!tableBody){
-      return;
-    }
-
-    /*
-     * INIT เฉพาะเมื่อเป็น DOM ของหน้า Recipes
-     * ที่เพิ่งถูกสร้างใหม่
-     */
-    if(initializedTableBody === tableBody){
-      return;
-    }
-
-    initializedTableBody = tableBody;
-
-    POS.inventoryRecipesInit();
-
-  }
-
-
-  /*
-   * กรณีหน้า Recipes มีอยู่แล้วตอน JS ถูกโหลด
-   */
-  tryInit();
-
-
-  /*
-   * กรณีผู้ใช้กดเข้าหน้า Recipes ภายหลัง
-   * ซึ่ง DOM ถูกสร้างแบบ Dynamic
-   */
-  const observer =
-    new MutationObserver(function(){
-
-      tryInit();
-
-    });
-
-
-  if(document.body){
-
-    observer.observe(
-      document.body,
-      {
-        childList:true,
-        subtree:true
-      }
-    );
-
-  }
-
-})();
