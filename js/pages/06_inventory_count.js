@@ -925,6 +925,8 @@ POS.stockCountFormatCountable = function(
    RENDER
    ===================================================== */
 
+POS.stockCountRenderToken = 0;
+
 POS.inventoryCountRender = function(){
 
   const body =
@@ -1092,8 +1094,9 @@ POS.inventoryCountRender = function(){
   }
 
 
-  body.innerHTML =
-    items.map(item => {
+  const renderToken = ++POS.stockCountRenderToken;
+
+  const renderItem = item => {
 
       const hasCount =
         item.counted_qty !== null &&
@@ -1513,21 +1516,53 @@ POS.inventoryCountRender = function(){
         </tr>
       `;
 
-    }).join("");
+    };
+
+  /* Render in small chunks so iPad does not block on one huge DOM update. */
+  body.innerHTML = "";
+
+  const CHUNK_SIZE = 20;
+  let chunkIndex = 0;
+
+  const renderChunk = () => {
+    if(renderToken !== POS.stockCountRenderToken){
+      return;
+    }
+
+    const endIndex = Math.min(
+      chunkIndex + CHUNK_SIZE,
+      items.length
+    );
+
+    let chunkHtml = "";
+    for(; chunkIndex < endIndex; chunkIndex++){
+      chunkHtml += renderItem(items[chunkIndex]);
+    }
+
+    body.insertAdjacentHTML("beforeend", chunkHtml);
+
+    if(chunkIndex < items.length){
+      requestAnimationFrame(renderChunk);
+    }
+  };
+
+  requestAnimationFrame(renderChunk);
 
 
-  body
-    .querySelectorAll(
-      "input[data-stock-count-id]"
-    )
-    .forEach(input => {
+  body.addEventListener(
+    "input",
+    function(event){
 
-      input.addEventListener(
-        "input",
-        function(){
+          const input = event.target?.closest(
+            "input[data-stock-count-id]"
+          );
+
+          if(!input || !body.contains(input)){
+            return;
+          }
 
           const id =
-            this.getAttribute(
+            input.getAttribute(
               "data-stock-count-id"
             );
 
@@ -1546,7 +1581,7 @@ POS.inventoryCountRender = function(){
 
 
           const row =
-            this.closest("tr");
+            input.closest("tr");
 
           if(!row){
             return;
@@ -1709,8 +1744,6 @@ POS.inventoryCountRender = function(){
 
         }
       );
-
-    });
 
 };
 
