@@ -340,6 +340,7 @@ POS.pages.inventoryRecipes = async function(){
                 <th style="
                   padding:12px;
                   text-align:left;
+                  white-space:nowrap;
                   color:#475569;
                   font-size:12px;
                   font-weight:800;
@@ -350,6 +351,7 @@ POS.pages.inventoryRecipes = async function(){
                 <th style="
                   padding:12px;
                   text-align:left;
+                  white-space:nowrap;
                   color:#475569;
                   font-size:12px;
                   font-weight:800;
@@ -360,6 +362,7 @@ POS.pages.inventoryRecipes = async function(){
                 <th style="
                   padding:12px;
                   text-align:center;
+                  white-space:nowrap;
                   color:#475569;
                   font-size:12px;
                   font-weight:800;
@@ -370,6 +373,7 @@ POS.pages.inventoryRecipes = async function(){
                 <th style="
                   padding:12px;
                   text-align:center;
+                  white-space:nowrap;
                   color:#475569;
                   font-size:12px;
                   font-weight:800;
@@ -380,6 +384,7 @@ POS.pages.inventoryRecipes = async function(){
                 <th style="
                   padding:12px;
                   text-align:center;
+                  white-space:nowrap;
                   color:#475569;
                   font-size:12px;
                   font-weight:800;
@@ -953,6 +958,7 @@ POS.inventoryRecipesRender = function(){
           <td style="
             padding:14px 12px;
             font-size:13px;
+            white-space:nowrap;
             color:#64748b;
             font-weight:700;
           ">
@@ -964,6 +970,7 @@ POS.inventoryRecipesRender = function(){
           <td style="
             padding:14px 12px;
             font-size:14px;
+            white-space:nowrap;
             color:#1f2937;
             font-weight:800;
           ">
@@ -975,6 +982,7 @@ POS.inventoryRecipesRender = function(){
           <td style="
             padding:14px 12px;
             text-align:center;
+            white-space:nowrap;
             font-size:14px;
             font-weight:800;
             color:#2563eb;
@@ -986,11 +994,10 @@ POS.inventoryRecipesRender = function(){
           <td style="
             padding:14px 12px;
             text-align:center;
+            white-space:nowrap;
           ">
             <span style="
-              display:inline-flex;
-              align-items:center;
-              justify-content:center;
+              display:inline-block;
               min-width:72px;
               padding:6px 10px;
               border-radius:999px;
@@ -1006,6 +1013,7 @@ POS.inventoryRecipesRender = function(){
           <td style="
             padding:14px 12px;
             text-align:center;
+            white-space:nowrap;
           ">
             <button
               type="button"
