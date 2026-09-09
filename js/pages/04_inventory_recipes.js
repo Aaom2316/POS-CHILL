@@ -716,30 +716,32 @@ POS.inventoryRecipesLoad = async function(){
 POS.inventoryRecipesRender = function(){
 
   const body =
-    document.getElementById(
-      "posInventoryRecipesTableBody"
-    );
+    document.getElementById("posInventoryRecipesTableBody");
 
   if(!body){
     return;
   }
 
+  /*
+   * Mobile / iPad optimization:
+   * ไม่สร้าง <tr> ทั้งหมดในครั้งเดียว เพราะ WebKit บน iPad/iPhone
+   * จะช้ากว่า Chrome บนคอมมากเมื่อ DOM ตารางมีจำนวนมาก
+   */
+  POS.inventoryRecipesRenderToken =
+    Number(POS.inventoryRecipesRenderToken || 0) + 1;
+
+  const renderToken = POS.inventoryRecipesRenderToken;
+
   const searchInput =
-    document.getElementById(
-      "posInventoryRecipesSearch"
-    );
+    document.getElementById("posInventoryRecipesSearch");
 
   const keyword =
-    String(
-      searchInput?.value || ""
-    )
+    String(searchInput?.value || "")
       .trim()
       .toLowerCase();
 
   const recipes =
-    Array.isArray(
-      POS.inventoryRecipesData
-    )
+    Array.isArray(POS.inventoryRecipesData)
       ? POS.inventoryRecipesData
       : [];
 
@@ -748,176 +750,93 @@ POS.inventoryRecipesRender = function(){
   recipes.forEach(function(item){
 
     const menuId =
-      String(
-        item?.menu_id || ""
-      );
+      String(item?.menu_id || "");
 
     if(!menuId){
       return;
     }
 
-    if(!grouped.has(menuId)){
-      grouped.set(
-        menuId,
-        {
-          menu_id: menuId,
-          menu_sku:
-            item?.menu_sku || "-",
-          menu_name:
-            item?.menu_name || "-",
-          items: []
-        }
-      );
+    let group = grouped.get(menuId);
+
+    if(!group){
+      group = {
+        menu_id: menuId,
+        menu_sku: item?.menu_sku || "-",
+        menu_name: item?.menu_name || "-",
+        items: []
+      };
+
+      grouped.set(menuId, group);
     }
 
-    grouped
-      .get(menuId)
-      .items
-      .push(item);
+    group.items.push(item);
 
   });
 
-
-  let rows =
-    Array.from(
-      grouped.values()
-    );
-
+  let rows = Array.from(grouped.values());
 
   if(keyword){
+    rows = rows.filter(function(group){
 
-    rows =
-      rows.filter(function(group){
+      const menuText =
+        String(group.menu_sku || "") +
+        " " +
+        String(group.menu_name || "");
 
-        const menuText =
-          (
-            String(group.menu_sku || "") +
-            " " +
-            String(group.menu_name || "")
-          )
-            .toLowerCase();
+      return menuText.toLowerCase().includes(keyword);
 
-        return menuText.includes(keyword);
-
-      });
-
+    });
   }
-
 
   rows.sort(function(a,b){
-
     return String(a.menu_name || "")
-      .localeCompare(
-        String(b.menu_name || ""),
-        "th"
-      );
-
+      .localeCompare(String(b.menu_name || ""), "th");
   });
 
+  const totalRecipes = rows.length;
+  const activeRecipes = grouped.size;
 
-  const totalRecipes =
-    rows.length;
+  const ingredientIds = new Set();
 
-  const activeRecipes =
-    Array.from(
-      grouped.values()
-    ).length;
+  recipes.forEach(function(item){
+    const id = String(item?.ingredient_id || "");
+    if(id){
+      ingredientIds.add(id);
+    }
+  });
 
-  const ingredientCount =
-    new Set(
-      recipes
-        .map(x => String(x?.ingredient_id || ""))
-        .filter(Boolean)
-    ).size;
-
+  const ingredientCount = ingredientIds.size;
 
   const totalEl =
-    document.getElementById(
-      "posInventoryRecipesTotal"
-    );
-
+    document.getElementById("posInventoryRecipesTotal");
   const activeEl =
-    document.getElementById(
-      "posInventoryRecipesActive"
-    );
-
+    document.getElementById("posInventoryRecipesActive");
   const ingredientEl =
-    document.getElementById(
-      "posInventoryRecipesIngredients"
-    );
-
+    document.getElementById("posInventoryRecipesIngredients");
   const listCountEl =
-    document.getElementById(
-      "posInventoryRecipesListCount"
-    );
+    document.getElementById("posInventoryRecipesListCount");
 
-
-  if(totalEl){
-    totalEl.textContent =
-      String(totalRecipes);
-  }
-
-  if(activeEl){
-    activeEl.textContent =
-      String(activeRecipes);
-  }
-
-  if(ingredientEl){
-    ingredientEl.textContent =
-      String(ingredientCount);
-  }
-
-  if(listCountEl){
-    listCountEl.textContent =
-      String(rows.length) +
-      " รายการ";
-  }
-
+  if(totalEl) totalEl.textContent = String(totalRecipes);
+  if(activeEl) activeEl.textContent = String(activeRecipes);
+  if(ingredientEl) ingredientEl.textContent = String(ingredientCount);
+  if(listCountEl) listCountEl.textContent = String(rows.length) + " รายการ";
 
   if(!rows.length){
 
     body.innerHTML = `
       <tr>
-        <td colspan="5"
-            style="
-              padding:60px 20px;
-              text-align:center;
-            ">
-
+        <td colspan="5" style="padding:60px 20px;text-align:center;">
           <div style="
-            width:56px;
-            height:56px;
-            margin:0 auto 12px;
-            border-radius:50%;
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            background:#fff1f2;
-            font-size:25px;
-          ">
-            🍳
+            width:56px;height:56px;margin:0 auto 12px;border-radius:50%;
+            display:flex;align-items:center;justify-content:center;
+            background:#fff1f2;font-size:25px;
+          ">🍳</div>
+          <div style="font-size:15px;font-weight:800;color:#64748b;">
+            ${keyword ? "ไม่พบสูตรที่ค้นหา" : "ยังไม่มีข้อมูลสูตร"}
           </div>
-
-          <div style="
-            font-size:15px;
-            font-weight:800;
-            color:#64748b;
-          ">
-            ${keyword
-              ? "ไม่พบสูตรที่ค้นหา"
-              : "ยังไม่มีข้อมูลสูตร"}
+          <div style="margin-top:5px;font-size:13px;color:#94a3b8;">
+            ${keyword ? "ลองเปลี่ยนคำค้นหา" : "กด “เพิ่มสูตร” เพื่อเริ่มสร้างสูตรอาหาร"}
           </div>
-
-          <div style="
-            margin-top:5px;
-            font-size:13px;
-            color:#94a3b8;
-          ">
-            ${keyword
-              ? "ลองเปลี่ยนคำค้นหา"
-              : "กด “เพิ่มสูตร” เพื่อเริ่มสร้างสูตรอาหาร"}
-          </div>
-
         </td>
       </tr>
     `;
@@ -925,97 +844,78 @@ POS.inventoryRecipesRender = function(){
     return;
   }
 
+  /*
+   * เคลียร์ตารางทันที แล้วทยอยเติมแถวเป็นชุด ๆ ผ่าน requestAnimationFrame
+   * ทำให้ iPad/mobile มีโอกาสวาดหน้าออกมาก่อน ไม่ค้างอยู่กับงาน JS ก้อนใหญ่
+   */
+  body.innerHTML = "";
 
-  body.innerHTML =
-    rows.map(function(group){
+  const isMobileLike =
+    window.innerWidth <= 900 ||
+    Number(navigator.maxTouchPoints || 0) > 0;
 
-      return `
-        <tr style="
-          border-bottom:1px solid #eef1f4;
-        ">
+  const batchSize = isMobileLike ? 20 : 60;
+  let index = 0;
 
-          <td style="
-            padding:14px 12px;
-            font-size:13px;
-            color:#64748b;
-            font-weight:700;
-          ">
-            ${POS.inventoryRecipesEscape(
-              group.menu_sku
-            )}
+  function renderNextBatch(){
+
+    if(renderToken !== POS.inventoryRecipesRenderToken){
+      return;
+    }
+
+    const end = Math.min(index + batchSize, rows.length);
+    let html = "";
+
+    for(; index < end; index++){
+
+      const group = rows[index];
+
+      html += `
+        <tr style="border-bottom:1px solid #eef1f4;">
+          <td style="padding:14px 12px;font-size:13px;color:#64748b;font-weight:700;">
+            ${POS.inventoryRecipesEscape(group.menu_sku)}
           </td>
-
-          <td style="
-            padding:14px 12px;
-            font-size:14px;
-            color:#1f2937;
-            font-weight:800;
-          ">
-            ${POS.inventoryRecipesEscape(
-              group.menu_name
-            )}
+          <td style="padding:14px 12px;font-size:14px;color:#1f2937;font-weight:800;">
+            ${POS.inventoryRecipesEscape(group.menu_name)}
           </td>
-
-          <td style="
-            padding:14px 12px;
-            text-align:center;
-            font-size:14px;
-            font-weight:800;
-            color:#2563eb;
-          ">
-            ${group.items.length}
-            รายการ
+          <td style="padding:14px 12px;text-align:center;font-size:14px;font-weight:800;color:#2563eb;">
+            ${group.items.length} รายการ
           </td>
-
-          <td style="
-            padding:14px 12px;
-            text-align:center;
-          ">
+          <td style="padding:14px 12px;text-align:center;">
             <span style="
-              display:inline-flex;
-              align-items:center;
-              justify-content:center;
-              min-width:72px;
-              padding:6px 10px;
-              border-radius:999px;
-              background:#e8f6ec;
-              color:#267a3d;
-              font-size:12px;
-              font-weight:800;
-            ">
-              ใช้งาน
-            </span>
+              display:inline-flex;align-items:center;justify-content:center;
+              min-width:72px;padding:6px 10px;border-radius:999px;
+              background:#e8f6ec;color:#267a3d;font-size:12px;font-weight:800;
+            ">ใช้งาน</span>
           </td>
-
-          <td style="
-            padding:14px 12px;
-            text-align:center;
-          ">
+          <td style="padding:14px 12px;text-align:center;">
             <button
               type="button"
               onclick="POS.inventoryRecipesOpenManage('${String(group.menu_id).replace(/'/g,"\\'")}')"
               style="
-                min-height:36px;
-                padding:0 12px;
-                border-radius:8px;
-                border:1px solid #d7dee8;
-                background:#fff;
-                color:#334155;
-                font-weight:700;
-                cursor:pointer;
+                min-height:36px;padding:0 12px;border-radius:8px;
+                border:1px solid #d7dee8;background:#fff;color:#334155;
+                font-weight:700;cursor:pointer;
               "
-            >
-              ⚙️ จัดการ
-            </button>
+            >⚙️ จัดการ</button>
           </td>
-
         </tr>
       `;
+    }
 
-    }).join("");
+    if(html){
+      body.insertAdjacentHTML("beforeend", html);
+    }
+
+    if(index < rows.length){
+      requestAnimationFrame(renderNextBatch);
+    }
+
+  }
+
+  requestAnimationFrame(renderNextBatch);
 
 };
-
 
 /* =====================================================
    RECIPES : MODAL
@@ -2683,7 +2583,12 @@ POS.inventoryRecipesInit = function(){
   }
 
 
-  POS.inventoryRecipesLoad();
+  /* ให้ WebKit วาดหน้า Recipes ก่อน แล้วค่อยเริ่มโหลดข้อมูล */
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){
+      POS.inventoryRecipesLoad();
+    });
+  });
 
 };
 
@@ -2707,60 +2612,46 @@ POS.inventoryRecipesInit = function(){
 (function initRecipesWhenReady(){
 
   let initializedTableBody = null;
+  let observer = null;
 
   function tryInit(){
 
     const tableBody =
-      document.getElementById(
-        "posInventoryRecipesTableBody"
-      );
+      document.getElementById("posInventoryRecipesTableBody");
 
-    if(!tableBody){
-      return;
-    }
-
-    /*
-     * INIT เฉพาะเมื่อเป็น DOM ของหน้า Recipes
-     * ที่เพิ่งถูกสร้างใหม่
-     */
-    if(initializedTableBody === tableBody){
+    if(!tableBody || initializedTableBody === tableBody){
       return;
     }
 
     initializedTableBody = tableBody;
 
+    /* เจอหน้า Recipes แล้ว ไม่ต้องเฝ้า DOM ต่อ */
+    if(observer){
+      observer.disconnect();
+      observer = null;
+    }
+
     POS.inventoryRecipesInit();
 
   }
 
-
-  /*
-   * กรณีหน้า Recipes มีอยู่แล้วตอน JS ถูกโหลด
-   */
   tryInit();
 
+  if(!initializedTableBody){
 
-  /*
-   * กรณีผู้ใช้กดเข้าหน้า Recipes ภายหลัง
-   * ซึ่ง DOM ถูกสร้างแบบ Dynamic
-   */
-  const observer =
-    new MutationObserver(function(){
-
+    observer = new MutationObserver(function(){
       tryInit();
-
     });
 
+    const observeTarget =
+      document.getElementById("app") || document.body;
 
-  if(document.body){
-
-    observer.observe(
-      document.body,
-      {
+    if(observeTarget){
+      observer.observe(observeTarget, {
         childList:true,
         subtree:true
-      }
-    );
+      });
+    }
 
   }
 
