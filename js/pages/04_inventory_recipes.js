@@ -2686,6 +2686,15 @@ POS.inventoryRecipesInit = function(){
   }
 
 
+  /*
+   * ตอนเปิดหน้าแบบ Dynamic จาก Stock Router
+   * Router จะ LOAD หลังจาก 2 requestAnimationFrame
+   * เพื่อให้ Safari/iPad layout/paint หน้าใหม่ก่อน
+   */
+  if(POS.inventoryRecipesOpening){
+    return;
+  }
+
   POS.inventoryRecipesLoad();
 
 };

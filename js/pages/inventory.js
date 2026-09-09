@@ -324,6 +324,15 @@ POS.openInventorySubPage = async function(pageName){
   try{
 
     /*
+     * RECIPES เปิดแบบ Dynamic บน iPad/Safari
+     * ให้ Router เป็นผู้สั่ง LOAD หลังจากหน้าใหม่ settle
+     * เพื่อไม่ให้ MutationObserver โหลดตารางใน frame แรก
+     */
+    if(pageName === "inventoryRecipes"){
+      POS.inventoryRecipesOpening = true;
+    }
+
+    /*
      * สร้าง HTML ของหน้าที่ต้องการก่อน
      */
     const html = await page();
@@ -382,6 +391,37 @@ POS.openInventorySubPage = async function(pageName){
 
     /*
      * =================================================
+     * PAGE 04 : สูตร
+     * =================================================
+     *
+     * รอ 2 frame ให้ Safari/iPad สร้าง layout/paint
+     * ของหน้าใหม่ก่อน แล้วจึง render ตาราง
+     */
+    if(
+      pageName === "inventoryRecipes" &&
+      typeof POS.inventoryRecipesLoad === "function"
+    ){
+
+      await new Promise(function(resolve){
+        requestAnimationFrame(function(){
+          requestAnimationFrame(resolve);
+        });
+      });
+
+      const recipesHost =
+        document.querySelector("#pageContent");
+
+      if(recipesHost){
+        void recipesHost.offsetHeight;
+      }
+
+      POS.inventoryRecipesOpening = false;
+      await POS.inventoryRecipesLoad();
+    }
+
+
+    /*
+     * =================================================
      * PAGE 01 : วัตถุดิบ
      * =================================================
      *
@@ -426,6 +466,10 @@ POS.openInventorySubPage = async function(pageName){
     }
 
   }catch(error){
+
+    if(pageName === "inventoryRecipes"){
+      POS.inventoryRecipesOpening = false;
+    }
 
     console.error(
       "เปิดหน้า Stock ไม่สำเร็จ:",
