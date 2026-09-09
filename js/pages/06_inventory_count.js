@@ -572,6 +572,8 @@ POS.inventoryCountLoad = async function(){
         ? unitResult.data
         : [];
 
+    POS.stockCountBuildUnitsIndex();
+
 
     POS.stockCountData =
       ingredients
@@ -656,80 +658,60 @@ POS.inventoryCountLoad = async function(){
    COUNT UNIT HELPERS
    ===================================================== */
 
-POS.stockCountGetUnits = function(item){
+POS.stockCountUnitsByIngredient = Object.create(null);
 
-  const allUnits =
-    Array.isArray(POS.stockCountUnitsData)
-      ? POS.stockCountUnitsData
-      : [];
+POS.stockCountBuildUnitsIndex = function(){
+  const allUnits = Array.isArray(POS.stockCountUnitsData)
+    ? POS.stockCountUnitsData
+    : [];
 
+  const index = Object.create(null);
 
-  const units =
-    allUnits
-      .filter(unit => {
+  allUnits.forEach(unit => {
+    if(!unit) return;
 
-        if(!unit){
-          return false;
-        }
+    const active =
+      unit.active === true ||
+      String(unit.active).toUpperCase() === "TRUE";
 
-        const sameIngredient =
-          String(unit.ingredient_id || "") ===
-          String(item.id || "");
+    if(!active) return;
 
-        const sameSku =
-          !sameIngredient &&
-          String(unit.ingredient_sku || unit.sku || "")
-            .toLowerCase() ===
-          String(item.sku || "")
-            .toLowerCase();
+    const ingredientId = String(unit.ingredient_id || "");
+    const sku = String(unit.ingredient_sku || unit.sku || "").toLowerCase();
+    const multiple = Number(unit.multiple);
 
-        const active =
-          unit.active === true ||
-          String(unit.active).toUpperCase() === "TRUE";
+    const normalized = {
+      id: unit.id,
+      unit_name: unit.unit_name || unit.name || "",
+      size: Number.isFinite(multiple) && multiple > 0 ? multiple : 1
+    };
 
-        return active &&
-          (sameIngredient || sameSku);
-      })
-      .map(unit => {
+    if(!normalized.unit_name || normalized.size <= 0) return;
 
-        const multiple =
-          Number(unit.multiple);
+    if(ingredientId){
+      (index["id:" + ingredientId] ||= []).push(normalized);
+    }
 
-        return {
-          id:
-            unit.id,
+    if(sku){
+      (index["sku:" + sku] ||= []).push(normalized);
+    }
+  });
 
-          unit_name:
-            unit.unit_name ||
-            unit.name ||
-            "",
+  Object.keys(index).forEach(key => {
+    index[key].sort((a,b) => b.size - a.size);
+  });
 
-          size:
-            Number.isFinite(multiple) &&
-            multiple > 0
-              ? multiple
-              : 1
-        };
-
-      })
-      .filter(unit =>
-        unit.unit_name &&
-        unit.size > 0
-      );
-
-
-  /*
-   * เรียงจากหน่วยใหญ่ -> เล็ก
-   */
-  units.sort(
-    (a,b) =>
-      b.size - a.size
-  );
-
-
-  return units;
+  POS.stockCountUnitsByIngredient = index;
 };
 
+POS.stockCountGetUnits = function(item){
+  const index = POS.stockCountUnitsByIngredient || Object.create(null);
+  const byId = index["id:" + String(item?.id || "")] || [];
+  if(byId.length) return byId.slice();
+
+  const bySku = index["sku:" + String(item?.sku || "").toLowerCase()] || [];
+  return bySku.slice();
+};
 
 POS.stockCountBuildCountUnits = function(item){
 
