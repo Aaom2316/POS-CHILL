@@ -113,18 +113,20 @@ POS.pages.inventoryItems = async function(){
   */
   try{
 
+    /*
+       สำคัญ: ห้ามสร้าง Page 01 ด้วย tbody ที่มีแค่แถว
+       "กำลังโหลด" แล้วค่อยเพิ่มรายการภายหลัง
+       เพราะ scroll container จะคำนวณความสูงจาก DOM ที่ยังสั้น
+       ทำให้เห็นรายการเหมือนทยอยมาเป็นชุด ๆ
+
+       ให้โหลดข้อมูลชุดเดียวกับปุ่มรีเฟรชให้เสร็จก่อน
+       แล้วค่อยส่ง HTML ของ Page 01 เข้า Router
+    */
     if(
       POS.api &&
-      typeof POS.api.ingredientsList === "function" &&
-      typeof POS.api.purchaseUnitsList === "function" &&
       typeof POS.inventoryItemsPrefetch === "function"
     ){
-      /*
-         ไม่โหลดข้อมูลตรงนี้
-         ให้การกดแท็บทำงานผ่าน AUTO LOAD ด้านล่าง
-         ซึ่งจะเรียก inventoryItemsLoad(true)
-         = กระบวนการเดียวกับปุ่ม "รีเฟรช" โดยตรง
-      */
+      await POS.inventoryItemsPrefetch(true);
     }
 
   }catch(error){
@@ -2480,13 +2482,16 @@ POS.inventoryItemsDelete = async function(id){
     loadingTableBody = tableBody;
 
     /*
-       เปิดแท็บวัตถุดิบ = ทำเหมือนกดปุ่ม "รีเฟรช"
-       ใช้ true เพื่อบังคับโหลดข้อมูลใหม่ชุดเดียวกับ
-       onclick="POS.inventoryItemsLoad(true)"
+       Page 01 ถูกสร้างหลังข้อมูลโหลดครบแล้ว
+       จึงไม่ต้องเริ่มโหลด API ซ้ำตรงนี้
+       render เพียงครั้งเดียวเหมือนผลลัพธ์หลังรีเฟรช
     */
-    Promise.resolve(
-      POS.inventoryItemsLoad(true)
-    )
+    Promise.resolve().then(function(){
+      POS.inventoryItemsRender();
+      if(typeof POS.inventoryItemsFixScroll === "function"){
+        POS.inventoryItemsFixScroll();
+      }
+    })
     .catch(function(error){
 
       console.error(
