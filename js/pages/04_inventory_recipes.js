@@ -12,8 +12,8 @@ POS.pages.inventoryRecipes = async function(){
    * คืน HTML ให้ Router สร้าง DOM ก่อน แล้วค่อย INIT/LOAD
    */
   setTimeout(function(){
-    if(typeof POS.inventoryRecipesInit === "function"){
-      POS.inventoryRecipesInit();
+    if(typeof POS.inventoryRecipesLoad === "function"){
+      POS.inventoryRecipesLoad();
     }
   }, 0);
 
@@ -2699,16 +2699,8 @@ POS.inventoryRecipesInit = function(){
   }
 
 
-  /*
-   * ตอนเปิดหน้าแบบ Dynamic จาก Stock Router
-   * Router จะ LOAD หลังจาก 2 requestAnimationFrame
-   * เพื่อให้ Safari/iPad layout/paint หน้าใหม่ก่อน
-   */
-  if(POS.inventoryRecipesOpening){
-    return;
-  }
-
-  POS.inventoryRecipesLoad();
+  // LOAD ถูกเรียกจาก page factory หลัง DOM ถูกสร้างแล้ว
+  // ให้ INIT ทำหน้าที่ bind event เท่านั้น
 
 };
 
