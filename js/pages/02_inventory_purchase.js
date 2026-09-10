@@ -54,7 +54,7 @@ POS.pages.inventoryPurchase = async function(){
             font-weight:800;
             color:#1f2937;
           ">
-            🛒 ซื้อเข้า
+            🛒 Purchases
           </h1>
 
           <p class="page-subtitle" style="
