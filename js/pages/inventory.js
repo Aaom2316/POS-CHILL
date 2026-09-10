@@ -6,7 +6,7 @@ POS.pages.inventory = async function(){
       <h1 class="page-title">📦 สต็อก</h1>
 
       <p class="page-subtitle">
-        จัดการวัตถุดิบ / ซื้อเข้า / หน่วย / สูตร / Movement / ตรวจนับ
+        จัดการวัตถุดิบ / ซื้อเข้า / หน่วย / สูตร / การเคลื่อนไหว / ตรวจนับ
       </p>
 
       <!-- =================================================
@@ -237,7 +237,7 @@ POS.pages.inventory = async function(){
 
           <div>
             <div style="font-size:19px;font-weight:700;">
-              Movement
+              การเคลื่อนไหว
             </div>
 
             <div
