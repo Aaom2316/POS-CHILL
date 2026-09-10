@@ -27,7 +27,7 @@ POS.pages.inventoryCount = async function(){
             font-weight:800;
             color:#1f2937;
           ">
-            🔍 ตรวจนับ
+            🔍 Stock Count
           </h1>
 
           <p class="page-subtitle" style="
