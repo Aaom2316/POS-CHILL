@@ -80,7 +80,7 @@ POS.pages.inventoryUnits = async function(){
             font-weight:800;
             color:#1f2937;
           ">
-            📏 หน่วยซื้อ
+            📏 Units
           </h1>
 
           <p class="page-subtitle" style="
