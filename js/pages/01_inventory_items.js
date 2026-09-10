@@ -161,7 +161,12 @@ POS.pages.inventoryItems = async function(){
 
         <div>
 
-          <h1 class="page-title">
+          <h1 class="page-title" style="
+            margin:0 0 5px;
+            font-size:30px;
+            font-weight:800;
+            color:#1f2937;
+          ">
             📋 Ingredients
           </h1>
 
