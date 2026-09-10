@@ -162,7 +162,7 @@ POS.pages.inventoryItems = async function(){
         <div>
 
           <h1 class="page-title">
-            📋 วัตถุดิบ
+            📋 Ingredients
           </h1>
 
           <p class="page-subtitle">
