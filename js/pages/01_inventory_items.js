@@ -1,6 +1,6 @@
 window.POS = window.POS || {};
 
-/* TEST: INGREDIENTS REMAINING DISPLAY = STOCK COUNT STYLE */
+/* TEST: INGREDIENTS REMAINING DISPLAY = STOCK COUNT STYLE • ID + SKU MATCH */
 POS.pages = POS.pages || {};
 
 POS.inventoryItemsEditingSku = null;
@@ -1726,7 +1726,8 @@ POS.inventoryItemsFixScroll = function(){
 POS.inventoryItemsFormatStock = function(item){
 
   const stock = Number(item?.stock ?? 0);
-  const baseUnit = String(item?.base_unit || "").trim() || "หน่วย";
+  const baseUnit =
+    String(item?.base_unit || "").trim() || "หน่วย";
 
   if(!Number.isFinite(stock)){
     return "-";
@@ -1736,92 +1737,197 @@ POS.inventoryItemsFormatStock = function(item){
     return "0 " + baseUnit;
   }
 
-  const ingredientId = String(item?.id || "");
+  const ingredientId =
+    String(item?.id || "").trim();
+
+  const ingredientSku =
+    String(item?.sku || "").trim().toLowerCase();
+
+  const allUnits =
+    Array.isArray(POS.inventoryPurchaseUnitsData)
+      ? POS.inventoryPurchaseUnitsData
+      : [];
+
+  /*
+   * ใช้หลักเดียวกับหน้า "นับสต็อก"
+   * 1. หาโดย ingredient_id ก่อน
+   * 2. ถ้าไม่พบ ค่อยหาโดย SKU
+   * 3. ใช้เฉพาะหน่วยที่ active
+   */
+
+  let matchedUnits =
+    allUnits.filter(function(unit){
+
+      const active =
+        unit?.active === true ||
+        String(unit?.active || "").toUpperCase() === "TRUE";
+
+      if(!active){
+        return false;
+      }
+
+      return (
+        ingredientId &&
+        String(unit?.ingredient_id || "").trim() === ingredientId
+      );
+    });
+
+  /*
+   * ถ้าหาโดย ID ไม่เจอ ให้ fallback ไปหา SKU
+   * เหมือนหน้า Stock Count
+   */
+  if(!matchedUnits.length && ingredientSku){
+
+    matchedUnits =
+      allUnits.filter(function(unit){
+
+        const active =
+          unit?.active === true ||
+          String(unit?.active || "").toUpperCase() === "TRUE";
+
+        if(!active){
+          return false;
+        }
+
+        const unitSku =
+          String(
+            unit?.ingredient_sku ||
+            unit?.sku ||
+            ""
+          ).trim().toLowerCase();
+
+        return (
+          unitSku &&
+          unitSku === ingredientSku
+        );
+      });
+  }
 
   const units =
-    (Array.isArray(POS.inventoryPurchaseUnitsData)
-      ? POS.inventoryPurchaseUnitsData
-      : [])
-      .filter(function(unit){
-
-        if(String(unit?.ingredient_id || "") !== ingredientId){
-          return false;
-        }
-
-        if(unit?.active === false){
-          return false;
-        }
-
-        const multiple = Number(unit?.multiple ?? 0);
-
-        return Number.isFinite(multiple) && multiple > 0 &&
-          String(unit?.unit_name || "").trim() !== "";
-
-      })
+    matchedUnits
       .map(function(unit){
+
+        const multiple =
+          Number(unit?.multiple);
+
+        const name =
+          String(unit?.unit_name || "").trim();
+
+        if(
+          !Number.isFinite(multiple) ||
+          multiple <= 0 ||
+          !name
+        ){
+          return null;
+        }
+
         return {
-          name: String(unit.unit_name).trim(),
-          multiple: Number(unit.multiple)
+          name:name,
+          multiple:multiple
         };
-      });
+      })
+      .filter(Boolean);
 
   if(!units.length){
-    return stock.toLocaleString("th-TH") + " " + baseUnit;
+    return stock.toLocaleString("th-TH") +
+      " " + baseUnit;
   }
 
-  // หน่วยใหญ่สุด = multiple มากที่สุด
-  // หน่วยเล็กสุด = multiple น้อยที่สุด
+  /*
+   * หน่วยใหญ่สุด = multiple สูงสุด
+   * หน่วยเล็กสุด = multiple ต่ำสุด
+   */
   units.sort(function(a,b){
-    return a.multiple - b.multiple;
+    return b.multiple - a.multiple;
   });
 
-  const smallest = units[0];
-  const largest = units[units.length - 1];
+  const largest = units[0];
+  const smallest = units[units.length - 1];
 
-  // ถ้ามีเพียงหน่วยเดียว ใช้หน่วยนั้นได้เลย
-  if(largest.multiple === smallest.multiple){
+  if(
+    largest.multiple === smallest.multiple
+  ){
 
-    const qty = stock / smallest.multiple;
+    const qty =
+      stock / smallest.multiple;
 
     if(Number.isInteger(qty)){
-      return qty.toLocaleString("th-TH") + " " + smallest.name;
+      return (
+        qty.toLocaleString("th-TH") +
+        " " +
+        smallest.name
+      );
     }
 
-    return stock.toLocaleString("th-TH") + " " + baseUnit;
+    return (
+      stock.toLocaleString("th-TH") +
+      " " +
+      baseUnit
+    );
   }
 
-  const largeQty = Math.floor(stock / largest.multiple);
-  const remainder = stock - (largeQty * largest.multiple);
+  const largeQty =
+    Math.floor(
+      stock / largest.multiple
+    );
 
-  // แสดงหน่วยเล็กสุดเฉพาะส่วนที่เหลือ
-  const smallQty = Math.floor(remainder / smallest.multiple);
-  const finalRemainder = remainder - (smallQty * smallest.multiple);
+  const remainder =
+    stock -
+    (
+      largeQty *
+      largest.multiple
+    );
+
+  /*
+   * ใช้หน่วยเล็กสุดเฉพาะส่วนที่เหลือ
+   * ไม่ใช้หน่วยกลาง
+   */
+  const smallQty =
+    smallest.multiple > 0
+      ? Math.floor(
+          remainder / smallest.multiple
+        )
+      : 0;
+
+  const finalRemainder =
+    remainder -
+    (
+      smallQty *
+      smallest.multiple
+    );
 
   const parts = [];
 
   if(largeQty > 0){
     parts.push(
-      largeQty.toLocaleString("th-TH") + " " + largest.name
+      largeQty.toLocaleString("th-TH") +
+      " " +
+      largest.name
     );
   }
 
   if(smallQty > 0){
     parts.push(
-      smallQty.toLocaleString("th-TH") + " " + smallest.name
+      smallQty.toLocaleString("th-TH") +
+      " " +
+      smallest.name
     );
   }
 
-  // กรณีสต็อกมีเศษที่ไม่สามารถแปลงเป็นหน่วยซื้อเล็กสุดได้
-  if(Math.abs(finalRemainder) > 0.0000001){
+  if(
+    Math.abs(finalRemainder) >
+    0.0000001
+  ){
     parts.push(
-      finalRemainder.toLocaleString("th-TH") + " " + baseUnit
+      finalRemainder.toLocaleString("th-TH") +
+      " " +
+      baseUnit
     );
   }
 
   return parts.length
     ? parts.join(" + ")
     : "0 " + smallest.name;
-
 };
 
 
