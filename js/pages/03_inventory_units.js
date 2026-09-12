@@ -2,6 +2,11 @@ window.POS = window.POS || {};
 POS.pages = POS.pages || {};
 
 /* =====================================================
+   TEST 36 : SHOW EXISTING PURCHASE UNITS
+   BASE: 20260912-074516 (LATEST)
+   ===================================================== */
+
+/* =====================================================
    STOCK PAGE 03 : UNITS
    หน่วยซื้อ / การแปลงหน่วย
    - หน่วยหลัก = หน่วยฐานของสต็อก
@@ -584,6 +589,39 @@ POS.pages.inventoryUnits = async function(){
             </div>
 
 
+            <!-- EXISTING PURCHASE UNITS -->
+            <div
+              id="inventoryUnitsExistingList"
+              style="
+                margin-top:-4px;
+                margin-bottom:17px;
+                padding:12px 14px;
+                border:1px solid #e2e8f0;
+                border-radius:12px;
+                background:#f8fafc;
+              "
+            >
+              <div style="
+                font-size:13px;
+                font-weight:800;
+                color:#475569;
+                margin-bottom:7px;
+              ">
+                📦 หน่วยซื้อที่มีอยู่แล้ว
+              </div>
+
+              <div
+                id="inventoryUnitsExistingListBody"
+                style="
+                  color:#94a3b8;
+                  font-size:13px;
+                "
+              >
+                เลือกวัตถุดิบเพื่อดูหน่วยซื้อที่มีอยู่
+              </div>
+            </div>
+
+
             <div style="
               padding:16px;
               border:1px solid #e7ecef;
@@ -863,14 +901,129 @@ POS.inventoryUnitsIngredientChanged = function(){
   const baseUnit =
     document.getElementById("inventoryUnitsBaseUnit");
 
+  const existingBody =
+    document.getElementById(
+      "inventoryUnitsExistingListBody"
+    );
+
   const selected =
     select?.options[
       select.selectedIndex
     ];
 
+  const ingredientId =
+    String(select?.value || "");
+
   if(baseUnit){
     baseUnit.value =
       selected?.dataset?.baseUnit || "";
+  }
+
+  /*
+   * แสดงหน่วยซื้อที่มีอยู่แล้ว
+   * ใช้ POS.inventoryUnitsData จาก Load เดิม
+   * ไม่เรียก API เพิ่ม
+   */
+  if(existingBody){
+
+    if(!ingredientId){
+
+      existingBody.innerHTML =
+        "เลือกวัตถุดิบเพื่อดูหน่วยซื้อที่มีอยู่";
+
+    }else{
+
+      const items =
+        Array.isArray(POS.inventoryUnitsData)
+          ? POS.inventoryUnitsData
+          : [];
+
+      const existingUnits =
+        items.filter(function(item){
+
+          return String(
+            item?.ingredient_id || ""
+          ) === ingredientId;
+
+        });
+
+      if(!existingUnits.length){
+
+        existingBody.innerHTML =
+          "ยังไม่มีหน่วยซื้อสำหรับวัตถุดิบนี้";
+
+      }else{
+
+        existingBody.innerHTML =
+          existingUnits.map(function(item){
+
+            const unitName =
+              POS.inventoryUnitsEscapeHtml(
+                item?.unit_name || "-"
+              );
+
+            const factor =
+              Number(
+                item?.multiple ??
+                item?.multiplier ??
+                1
+              );
+
+            const factorText =
+              Number.isFinite(factor)
+                ? factor.toLocaleString(
+                    "th-TH",
+                    {
+                      maximumFractionDigits:6
+                    }
+                  )
+                : "1";
+
+            const base =
+              POS.inventoryUnitsEscapeHtml(
+                item?.base_unit || ""
+              );
+
+            return `
+              <div style="
+                display:flex;
+                align-items:center;
+                justify-content:space-between;
+                gap:10px;
+                padding:7px 0;
+                border-bottom:1px solid #eef2f7;
+              ">
+                <div style="
+                  font-weight:700;
+                  color:#334155;
+                ">
+                  📦 ${unitName}
+                </div>
+
+                <div style="
+                  color:#64748b;
+                  font-size:12px;
+                  white-space:nowrap;
+                ">
+                  1 ${unitName} = ${factorText} ${base}
+                </div>
+              </div>
+            `;
+
+          }).join("");
+
+        const rows =
+          existingBody.children;
+
+        if(rows.length){
+          rows[rows.length - 1].style.borderBottom =
+            "0";
+        }
+
+      }
+
+    }
+
   }
 
   POS.inventoryUnitsUpdatePreview();
