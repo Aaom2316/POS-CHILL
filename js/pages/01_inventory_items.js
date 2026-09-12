@@ -1,4 +1,6 @@
 window.POS = window.POS || {};
+
+/* TEST: INGREDIENTS REMAINING DISPLAY = STOCK COUNT STYLE */
 POS.pages = POS.pages || {};
 
 POS.inventoryItemsEditingSku = null;
@@ -1823,6 +1825,42 @@ POS.inventoryItemsFormatStock = function(item){
 };
 
 
+POS.inventoryItemsFormatStockDisplay = function(item){
+
+  const stock =
+    Number(item?.stock ?? 0);
+
+  const baseUnit =
+    String(item?.base_unit || "").trim() || "หน่วย";
+
+  const main =
+    POS.inventoryItemsFormatStock(item);
+
+  if(
+    !Number.isFinite(stock) ||
+    stock <= 0
+  ){
+    return main;
+  }
+
+  return `
+    <div>
+      ${main}
+    </div>
+
+    <div style="
+      margin-top:3px;
+      color:#94a3b8;
+      font-size:11px;
+      font-weight:500;
+    ">
+      ${stock.toLocaleString("th-TH")}
+      ${baseUnit}
+    </div>
+  `;
+};
+
+
 /* =====================================================
    RENDER
    ===================================================== */
@@ -2133,7 +2171,7 @@ POS.inventoryItemsRender = function(){
               font-weight:700;
             "
           >
-            ${POS.inventoryItemsFormatStock(item)}
+            ${POS.inventoryItemsFormatStockDisplay(item)}
           </td>
 
           <td
