@@ -1,6 +1,6 @@
 window.POS = window.POS || {};
 
-/* TEST: INGREDIENTS REMAINING DISPLAY = STOCK COUNT STYLE • ID + SKU MATCH */
+/* TEST: INGREDIENTS STOCK DISPLAY = STOCK COUNT UNIT LOGIC • TEST 34 */
 POS.pages = POS.pages || {};
 
 POS.inventoryItemsEditingSku = null;
@@ -73,6 +73,10 @@ POS.inventoryItemsPrefetch = function(forceReload = false){
         Array.isArray(unitResult.data)
           ? unitResult.data
           : [];
+
+      if(typeof POS.inventoryItemsBuildUnitsIndex === "function"){
+        POS.inventoryItemsBuildUnitsIndex();
+      }
 
       POS.inventoryItemsPrefetchReady = true;
 
@@ -1718,16 +1722,131 @@ POS.inventoryItemsFixScroll = function(){
 
 /* =====================================================
    STOCK DISPLAY UNIT
-   แสดงหน่วยใหญ่สุด + หน่วยเล็กสุดเท่านั้น
-   เช่น 30 ขวด -> 1 ลัง24 + 6 ขวด
-   ไม่ใช้หน่วยกลาง เช่น แพ็ค6 / ลัง12
+   ใช้ Logic หน่วยเดียวกับหน้า "ตรวจนับสต็อก"
+   - active ต้องเป็น true / TRUE เท่านั้น
+   - หา ingredient_id ก่อน
+   - ถ้าไม่พบ ค่อย fallback ด้วย SKU
+   - เรียง multiple จากมาก -> น้อย
+   - แสดงหน่วยใหญ่สุด + หน่วยเล็กสุด
    ===================================================== */
+
+POS.inventoryItemsUnitsByIngredient = Object.create(null);
+
+POS.inventoryItemsBuildUnitsIndex = function(){
+
+  const allUnits =
+    Array.isArray(POS.inventoryPurchaseUnitsData)
+      ? POS.inventoryPurchaseUnitsData
+      : [];
+
+  const index = Object.create(null);
+
+  allUnits.forEach(unit => {
+
+    if(!unit){
+      return;
+    }
+
+    const active =
+      unit.active === true ||
+      String(unit.active).toUpperCase() === "TRUE";
+
+    if(!active){
+      return;
+    }
+
+    const ingredientId =
+      String(unit.ingredient_id || "");
+
+    const sku =
+      String(
+        unit.ingredient_sku ||
+        unit.sku ||
+        ""
+      ).toLowerCase();
+
+    const multiple =
+      Number(unit.multiple);
+
+    const normalized = {
+      id: unit.id,
+      unit_name:
+        unit.unit_name ||
+        unit.name ||
+        "",
+      size:
+        Number.isFinite(multiple) && multiple > 0
+          ? multiple
+          : 1
+    };
+
+    if(
+      !normalized.unit_name ||
+      normalized.size <= 0
+    ){
+      return;
+    }
+
+    if(ingredientId){
+      (index["id:" + ingredientId] ||= [])
+        .push(normalized);
+    }
+
+    if(sku){
+      (index["sku:" + sku] ||= [])
+        .push(normalized);
+    }
+
+  });
+
+  Object.keys(index).forEach(key => {
+
+    index[key].sort(function(a,b){
+      return b.size - a.size;
+    });
+
+  });
+
+  POS.inventoryItemsUnitsByIngredient = index;
+
+};
+
+
+POS.inventoryItemsGetUnits = function(item){
+
+  const index =
+    POS.inventoryItemsUnitsByIngredient ||
+    Object.create(null);
+
+  const byId =
+    index[
+      "id:" +
+      String(item?.id || "")
+    ] || [];
+
+  if(byId.length){
+    return byId.slice();
+  }
+
+  const bySku =
+    index[
+      "sku:" +
+      String(item?.sku || "").toLowerCase()
+    ] || [];
+
+  return bySku.slice();
+
+};
+
 
 POS.inventoryItemsFormatStock = function(item){
 
-  const stock = Number(item?.stock ?? 0);
+  const stock =
+    Number(item?.stock ?? 0);
+
   const baseUnit =
-    String(item?.base_unit || "").trim() || "หน่วย";
+    String(item?.base_unit || "").trim() ||
+    "หน่วย";
 
   if(!Number.isFinite(stock)){
     return "-";
@@ -1737,128 +1856,10 @@ POS.inventoryItemsFormatStock = function(item){
     return "0 " + baseUnit;
   }
 
-  const ingredientId =
-    String(item?.id || "").trim();
-
-  const ingredientSku =
-    String(item?.sku || "").trim().toLowerCase();
-
-  const allUnits =
-    Array.isArray(POS.inventoryPurchaseUnitsData)
-      ? POS.inventoryPurchaseUnitsData
-      : [];
-
-  /*
-   * ใช้หลักเดียวกับหน้า "นับสต็อก"
-   * 1. หาโดย ingredient_id ก่อน
-   * 2. ถ้าไม่พบ ค่อยหาโดย SKU
-   * 3. ใช้เฉพาะหน่วยที่ active
-   */
-
-  let matchedUnits =
-    allUnits.filter(function(unit){
-
-      const active =
-        unit?.active === true ||
-        String(unit?.active || "").toUpperCase() === "TRUE";
-
-      if(!active){
-        return false;
-      }
-
-      return (
-        ingredientId &&
-        String(unit?.ingredient_id || "").trim() === ingredientId
-      );
-    });
-
-  /*
-   * ถ้าหาโดย ID ไม่เจอ ให้ fallback ไปหา SKU
-   * เหมือนหน้า Stock Count
-   */
-  if(!matchedUnits.length && ingredientSku){
-
-    matchedUnits =
-      allUnits.filter(function(unit){
-
-        const active =
-          unit?.active === true ||
-          String(unit?.active || "").toUpperCase() === "TRUE";
-
-        if(!active){
-          return false;
-        }
-
-        const unitSku =
-          String(
-            unit?.ingredient_sku ||
-            unit?.sku ||
-            ""
-          ).trim().toLowerCase();
-
-        return (
-          unitSku &&
-          unitSku === ingredientSku
-        );
-      });
-  }
-
   const units =
-    matchedUnits
-      .map(function(unit){
-
-        const multiple =
-          Number(unit?.multiple);
-
-        const name =
-          String(unit?.unit_name || "").trim();
-
-        if(
-          !Number.isFinite(multiple) ||
-          multiple <= 0 ||
-          !name
-        ){
-          return null;
-        }
-
-        return {
-          name:name,
-          multiple:multiple
-        };
-      })
-      .filter(Boolean);
+    POS.inventoryItemsGetUnits(item);
 
   if(!units.length){
-    return stock.toLocaleString("th-TH") +
-      " " + baseUnit;
-  }
-
-  /*
-   * หน่วยใหญ่สุด = multiple สูงสุด
-   * หน่วยเล็กสุด = multiple ต่ำสุด
-   */
-  units.sort(function(a,b){
-    return b.multiple - a.multiple;
-  });
-
-  const largest = units[0];
-  const smallest = units[units.length - 1];
-
-  if(
-    largest.multiple === smallest.multiple
-  ){
-
-    const qty =
-      stock / smallest.multiple;
-
-    if(Number.isInteger(qty)){
-      return (
-        qty.toLocaleString("th-TH") +
-        " " +
-        smallest.name
-      );
-    }
-
     return (
       stock.toLocaleString("th-TH") +
       " " +
@@ -1866,26 +1867,60 @@ POS.inventoryItemsFormatStock = function(item){
     );
   }
 
+  /*
+   * หน่วยใหญ่สุด = conversion สูงสุด
+   * หน่วยเล็กสุด = conversion ต่ำสุด
+   */
+  const largest =
+    units[0];
+
+  const smallest =
+    units.length > 1
+      ? units[units.length - 1]
+      : {
+          id:"__BASE_UNIT__",
+          unit_name:baseUnit,
+          size:1
+        };
+
+  const largestSize =
+    Number(largest.size) || 1;
+
+  const smallestSize =
+    Number(smallest.size) || 1;
+
+  /*
+   * ป้องกันกรณีมีหน่วยเดียวและ
+   * หน่วยนั้นมีขนาดมากกว่าหน่วยฐาน
+   */
+  const safeSmallest =
+    smallestSize > largestSize
+      ? {
+          id:"__BASE_UNIT__",
+          unit_name:baseUnit,
+          size:1
+        }
+      : smallest;
+
+  const safeSmallestSize =
+    Number(safeSmallest.size) || 1;
+
   const largeQty =
     Math.floor(
-      stock / largest.multiple
+      stock / largestSize
     );
 
   const remainder =
     stock -
     (
       largeQty *
-      largest.multiple
+      largestSize
     );
 
-  /*
-   * ใช้หน่วยเล็กสุดเฉพาะส่วนที่เหลือ
-   * ไม่ใช้หน่วยกลาง
-   */
   const smallQty =
-    smallest.multiple > 0
+    safeSmallestSize > 0
       ? Math.floor(
-          remainder / smallest.multiple
+          remainder / safeSmallestSize
         )
       : 0;
 
@@ -1893,7 +1928,7 @@ POS.inventoryItemsFormatStock = function(item){
     remainder -
     (
       smallQty *
-      smallest.multiple
+      safeSmallestSize
     );
 
   const parts = [];
@@ -1902,7 +1937,7 @@ POS.inventoryItemsFormatStock = function(item){
     parts.push(
       largeQty.toLocaleString("th-TH") +
       " " +
-      largest.name
+      largest.unit_name
     );
   }
 
@@ -1910,7 +1945,7 @@ POS.inventoryItemsFormatStock = function(item){
     parts.push(
       smallQty.toLocaleString("th-TH") +
       " " +
-      smallest.name
+      safeSmallest.unit_name
     );
   }
 
@@ -1927,7 +1962,8 @@ POS.inventoryItemsFormatStock = function(item){
 
   return parts.length
     ? parts.join(" + ")
-    : "0 " + smallest.name;
+    : "0 " + safeSmallest.unit_name;
+
 };
 
 
@@ -1937,7 +1973,8 @@ POS.inventoryItemsFormatStockDisplay = function(item){
     Number(item?.stock ?? 0);
 
   const baseUnit =
-    String(item?.base_unit || "").trim() || "หน่วย";
+    String(item?.base_unit || "").trim() ||
+    "หน่วย";
 
   const main =
     POS.inventoryItemsFormatStock(item);
@@ -1964,6 +2001,7 @@ POS.inventoryItemsFormatStockDisplay = function(item){
       ${baseUnit}
     </div>
   `;
+
 };
 
 
