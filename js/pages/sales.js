@@ -601,6 +601,61 @@ const businessDateIsFuture =
 
 
   // ===================================================
+  // BUSINESS DATE + TIME HELPER
+  // รายการจากหน้าโต๊ะให้ใช้วันทำการเป็นวันที่แสดง
+  // แต่คงเวลาเกิดรายการจริงไว้
+  // ===================================================
+
+  function getBusinessDisplayDateTime(value){
+
+    if(!value){
+      return "";
+    }
+
+    try{
+
+      const date =
+        new Date(value);
+
+      if(
+        isNaN(
+          date.getTime()
+        )
+      ){
+        return "";
+      }
+
+      const time =
+        date.toLocaleTimeString(
+          "en-GB",
+          {
+            timeZone:
+              "Asia/Bangkok",
+
+            hour:
+              "2-digit",
+
+            minute:
+              "2-digit"
+          }
+        );
+
+      return (
+        String(today).substring(0,10) +
+        "T" +
+        time
+      );
+
+    }catch(error){
+
+      return "";
+
+    }
+
+  }
+
+
+  // ===================================================
   // FILTER SALES วันนี้
   // ===================================================
 
@@ -940,9 +995,14 @@ const todayOrderRows =
           row.paid_at ||
           null,
 
+        // รายการจากหน้าโต๊ะ:
+        // ใช้ BUSINESS_DATE เป็นวันที่แสดง
+        // แต่ใช้เวลา ordered_at / created_at จริง
         date:
-          row.ordered_at ||
-          row.created_at,
+          getBusinessDisplayDateTime(
+            row.ordered_at ||
+            row.created_at
+          ),
 
         table_no:
           row.table_no

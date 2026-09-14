@@ -173,6 +173,58 @@ POS.ordersLoadDatabase = async function(force = false){
             const menu =
               menuMap[String(row.menu_id)] || {};
 
+            const rowQty =
+              Number(row.qty || 0);
+
+            const orderedAt =
+              row.ordered_at ||
+              row.created_at ||
+              null;
+
+            const cachedItem =
+              (POS.tableOrders?.[table] || [])
+                .find(item =>
+                  String(item.orderId) ===
+                  String(row.id)
+                );
+
+            const dbHistory =
+              orderedAt
+                ? [{
+                    type: "เพิ่ม",
+                    qty: rowQty,
+                    at: orderedAt
+                  }]
+                : [];
+
+            const cachedHistory =
+              Array.isArray(cachedItem?.history)
+                ? cachedItem.history
+                : [];
+
+            const history = [
+              ...dbHistory,
+              ...cachedHistory
+            ].filter((entry, index, arr) => {
+
+              const key =
+                String(entry?.type || "") +
+                "|" +
+                String(entry?.qty || 0) +
+                "|" +
+                String(entry?.at || "");
+
+              return arr.findIndex(item =>
+                String(item?.type || "") +
+                "|" +
+                String(item?.qty || 0) +
+                "|" +
+                String(item?.at || "")
+                === key
+              ) === index;
+
+            });
+
             return {
               orderId: row.id,
               billId: String(row.remark || "").trim(),
@@ -185,7 +237,8 @@ POS.ordersLoadDatabase = async function(force = false){
                 0
               ),
               emoji: menu.emoji || "🍹",
-              qty: Number(row.qty || 0)
+              qty: rowQty,
+              history: history
             };
 
           });
@@ -900,6 +953,8 @@ POS.ordersQuantityConfirm = async function(){
 // ไม่ใช้วันที่เครื่อง
 // =================================================
 
+let businessDate = "";
+
 if(!POS.tableBillIds){
 
   POS.tableBillIds = {};
@@ -931,7 +986,7 @@ if(!POS.tableBillIds[table]){
         "BUSINESS_DATE"
     );
 
-  const businessDate =
+  businessDate =
     businessDateSetting?.value
       ? String(
           businessDateSetting.value
@@ -995,6 +1050,25 @@ if(!POS.tableBillIds[table]){
 const billId =
   POS.tableBillIds[table];
 
+// ถ้ามี BILL ID เดิม ให้ใช้วันทำการที่ฝังอยู่ใน BILL ID
+// เพื่อไม่ให้รายการของบิลเดิมหลุดไปเป็นวันที่เครื่อง
+if(!businessDate){
+  const billDateMatch =
+    String(billId || "").match(/^B(\d{8})/);
+
+  if(billDateMatch){
+    const raw =
+      billDateMatch[1];
+
+    businessDate =
+      raw.substring(0,4) +
+      "-" +
+      raw.substring(4,6) +
+      "-" +
+      raw.substring(6,8);
+  }
+}
+
 
   if(!table){
 
@@ -1028,7 +1102,8 @@ const billId =
 
     // =================================================
     // บันทึกเข้า Orders Database
-    // Backend จะกำหนด business_date จาก SYSTEM
+    // ใช้ BUSINESS_DATE ของรอบทำการ
+    // ไม่ใช้วันที่เครื่อง
     // =================================================
 
     const result =
@@ -1044,7 +1119,10 @@ const billId =
       quantity,
 
     bill_id:
-      billId
+      billId,
+
+    business_date:
+      businessDate
 
   });
 
@@ -1100,11 +1178,25 @@ const billId =
           String(menu.id)
       );
 
+    const orderCreatedAt =
+      result.order?.ordered_at ||
+      result.order?.created_at ||
+      new Date().toISOString();
 
     if(existing){
 
       existing.qty +=
         quantity;
+
+      if(!Array.isArray(existing.history)){
+        existing.history = [];
+      }
+
+      existing.history.push({
+        type: "เพิ่ม",
+        qty: quantity,
+        at: orderCreatedAt
+      });
 
     }else{
 
@@ -1135,7 +1227,13 @@ const billId =
           "🍹",
 
         qty:
-          quantity
+          quantity,
+
+        history: [{
+          type: "เพิ่ม",
+          qty: quantity,
+          at: orderCreatedAt
+        }]
 
       });
 
@@ -1334,11 +1432,14 @@ POS.ordersRenderCart = function(){
             </button>
 
 
-            <strong class="orders-cart-qty">
-
+            <button
+              type="button"
+              class="orders-cart-qty-detail-btn"
+              onclick="event.stopPropagation(); POS.ordersShowHistory('${item.orderId}')"
+              title="ดูรายละเอียดการเพิ่มจำนวน"
+            >
               ${item.qty}
-
-            </strong>
+            </button>
 
 
             <button
@@ -1429,6 +1530,27 @@ POS.ordersChangeQty = function(
   if(newQty < 1){
     return;
   }
+
+  const changeAmount =
+    Math.abs(Number(change));
+
+  const changeAt =
+    new Date().toISOString();
+
+  if(!Array.isArray(item.history)){
+    item.history = [];
+  }
+
+  item.history.push({
+    type:
+      Number(change) > 0
+        ? "เพิ่ม"
+        : "ลด",
+    qty:
+      changeAmount,
+    at:
+      changeAt
+  });
 
   // =================================================
   // UI เปลี่ยนทันที ไม่ต้องรอ Server
@@ -1544,6 +1666,245 @@ POS.ordersChangeQty = function(
       );
 
 };
+
+/* =====================================================
+   รายละเอียดการเพิ่ม / เปลี่ยนจำนวน
+   ===================================================== */
+
+POS.ordersShowHistory = function(orderId){
+
+  const table =
+    Number(POS.currentTable);
+
+  const items =
+    POS.tableOrders?.[table] || [];
+
+  const item =
+    items.find(item =>
+      String(item.orderId) ===
+      String(orderId)
+    );
+
+  if(!item){
+    return;
+  }
+
+  const history =
+    Array.isArray(item.history)
+      ? item.history
+      : [];
+
+  const oldModal =
+    document.getElementById(
+      "ordersQtyHistoryModal"
+    );
+
+  if(oldModal){
+    oldModal.remove();
+  }
+
+  const formatDateTime = function(value){
+
+    if(!value){
+      return "-";
+    }
+
+    const date =
+      new Date(value);
+
+    if(Number.isNaN(date.getTime())){
+      return String(value);
+    }
+
+    // ใช้วันทำการที่ฝังอยู่ใน BILL ID
+    // ไม่ใช้วันที่เครื่อง
+    const billDateMatch =
+      String(item.billId || "").match(/^B(\d{8})/);
+
+    if(billDateMatch){
+
+      const raw =
+        billDateMatch[1];
+
+      const businessDate =
+        raw.substring(0,4) +
+        "-" +
+        raw.substring(4,6) +
+        "-" +
+        raw.substring(6,8);
+
+      const time =
+        String(date.getHours()).padStart(2,"0") +
+        ":" +
+        String(date.getMinutes()).padStart(2,"0") +
+        ":" +
+        String(date.getSeconds()).padStart(2,"0");
+
+      const displayDate =
+        new Date(
+          businessDate + "T00:00:00"
+        );
+
+      if(!Number.isNaN(displayDate.getTime())){
+
+        return (
+          displayDate.toLocaleDateString(
+            "th-TH",
+            {
+              year:"numeric",
+              month:"2-digit",
+              day:"2-digit"
+            }
+          ) +
+          " " +
+          time
+        );
+
+      }
+
+    }
+
+    return date.toLocaleString(
+      "th-TH",
+      {
+        year:"numeric",
+        month:"2-digit",
+        day:"2-digit",
+        hour:"2-digit",
+        minute:"2-digit",
+        second:"2-digit"
+      }
+    );
+
+  };
+
+  const historyHtml =
+    history.length
+      ? history.map((entry, index) => {
+
+          const type =
+            entry?.type === "ลด"
+              ? "ลด"
+              : "เพิ่ม";
+
+          const qty =
+            Number(entry?.qty || 0);
+
+          return `
+            <div class="orders-qty-history-row">
+
+              <div class="orders-qty-history-index">
+                ${index + 1}
+              </div>
+
+              <div class="orders-qty-history-main">
+
+                <div class="orders-qty-history-type">
+                  ${type} ${qty} รายการ
+                </div>
+
+                <div class="orders-qty-history-time">
+                  ${formatDateTime(entry?.at)}
+                </div>
+
+              </div>
+
+            </div>
+          `;
+
+        }).join("")
+      : `
+        <div class="orders-qty-history-empty">
+          ยังไม่มีประวัติการเพิ่มจำนวน
+        </div>
+      `;
+
+  const modal =
+    document.createElement("div");
+
+  modal.id =
+    "ordersQtyHistoryModal";
+
+  modal.innerHTML = `
+
+    <div
+      class="orders-qty-history-backdrop"
+      onclick="POS.ordersCloseHistory(event)"
+    >
+
+      <div
+        class="orders-qty-history-box"
+        onclick="event.stopPropagation()"
+      >
+
+        <button
+          type="button"
+          class="orders-qty-history-close"
+          onclick="POS.ordersCloseHistory()"
+        >
+          ×
+        </button>
+
+        <div class="orders-qty-history-icon">
+          ${item.emoji || "🍹"}
+        </div>
+
+        <div class="orders-qty-history-title">
+          ${item.name || ""}
+        </div>
+
+        <div class="orders-qty-history-subtitle">
+          จำนวนรวม ${Number(item.qty || 0)} รายการ
+        </div>
+
+        <div class="orders-qty-history-list">
+          ${historyHtml}
+        </div>
+
+        <button
+          type="button"
+          class="orders-qty-history-ok"
+          onclick="POS.ordersCloseHistory()"
+        >
+          ปิด
+        </button>
+
+      </div>
+
+    </div>
+
+  `;
+
+  document.body.appendChild(
+    modal
+  );
+
+};
+
+
+POS.ordersCloseHistory = function(event){
+
+  if(
+    event &&
+    event.target &&
+    !event.target.classList.contains(
+      "orders-qty-history-backdrop"
+    )
+  ){
+    return;
+  }
+
+  const modal =
+    document.getElementById(
+      "ordersQtyHistoryModal"
+    );
+
+  if(modal){
+    modal.remove();
+  }
+
+};
+
 
 /* =====================================================
    ลบสินค้าออกจากโต๊ะ
@@ -3213,6 +3574,211 @@ POS.pages.orders = function(){
       }
 
 
+      .orders-cart-qty-detail-btn{
+        min-width:42px;
+        height:34px;
+
+        border:1px solid #bbf7d0;
+        border-radius:9px;
+
+        background:#f0fdf4;
+        color:#008f68;
+
+        font-family:inherit;
+        font-size:17px;
+        font-weight:900;
+
+        cursor:pointer;
+      }
+
+
+      .orders-cart-qty-detail-btn:hover{
+        background:#dcfce7;
+      }
+
+
+      .orders-cart-qty-detail-btn:active{
+        transform:scale(.95);
+      }
+
+
+      /* =================================================
+         QTY HISTORY MODAL
+         ================================================= */
+
+      .orders-qty-history-backdrop{
+        position:fixed;
+        inset:0;
+
+        display:flex;
+        align-items:center;
+        justify-content:center;
+
+        padding:20px;
+
+        background:#00000055;
+
+        z-index:10001;
+      }
+
+
+      .orders-qty-history-box{
+        position:relative;
+
+        width:100%;
+        max-width:520px;
+        max-height:90vh;
+
+        overflow-y:auto;
+
+        padding:28px;
+
+        box-sizing:border-box;
+
+        background:#ffffff;
+        border-radius:20px;
+
+        box-shadow:
+          0 12px 40px #00000025;
+
+        text-align:center;
+      }
+
+
+      .orders-qty-history-close{
+        position:absolute;
+        top:12px;
+        right:14px;
+
+        width:36px;
+        height:36px;
+
+        border:0;
+        border-radius:10px;
+
+        background:#f3f4f6;
+        color:#374151;
+
+        font-size:24px;
+        font-weight:700;
+
+        cursor:pointer;
+      }
+
+
+      .orders-qty-history-icon{
+        font-size:42px;
+        margin-bottom:8px;
+      }
+
+
+      .orders-qty-history-title{
+        font-size:22px;
+        font-weight:900;
+        color:#111827;
+      }
+
+
+      .orders-qty-history-subtitle{
+        margin-top:5px;
+        color:#64748b;
+        font-size:15px;
+        font-weight:700;
+      }
+
+
+      .orders-qty-history-list{
+        margin-top:22px;
+        text-align:left;
+      }
+
+
+      .orders-qty-history-row{
+        display:flex;
+        align-items:center;
+        gap:12px;
+
+        padding:13px 0;
+
+        border-bottom:1px solid #e5e7eb;
+      }
+
+
+      .orders-qty-history-index{
+        width:34px;
+        height:34px;
+
+        display:flex;
+        align-items:center;
+        justify-content:center;
+
+        flex:0 0 34px;
+
+        border-radius:10px;
+
+        background:#f0fdf4;
+        color:#008f68;
+
+        font-size:14px;
+        font-weight:900;
+      }
+
+
+      .orders-qty-history-main{
+        min-width:0;
+        flex:1;
+      }
+
+
+      .orders-qty-history-type{
+        font-size:16px;
+        font-weight:800;
+        color:#111827;
+      }
+
+
+      .orders-qty-history-time{
+        margin-top:3px;
+        color:#64748b;
+        font-size:14px;
+        font-weight:600;
+      }
+
+
+      .orders-qty-history-empty{
+        padding:25px 10px;
+
+        border-radius:12px;
+
+        background:#f9fafb;
+        color:#6b7280;
+
+        text-align:center;
+        font-size:15px;
+      }
+
+
+      .orders-qty-history-ok{
+        width:100%;
+
+        margin-top:22px;
+
+        padding:13px;
+
+        border:0;
+        border-radius:12px;
+
+        background:#86efac;
+        color:#14532d;
+
+        font-family:inherit;
+        font-size:17px;
+        font-weight:900;
+
+        cursor:pointer;
+      }
+
+
       .orders-cart-delete{
         width:38px;
         height:38px;
@@ -3849,7 +4415,30 @@ POS.ordersLoadPaidBills = async function(){
             row.table_no,
 
           soldAt:
-            row.ordered_at,
+            (() => {
+              const match =
+                String(billId || "")
+                  .match(/^B(\d{8})(\d{6})/);
+
+              if(match){
+                const datePart = match[1];
+                const timePart = match[2];
+
+                return datePart.substring(0,4) +
+                  "-" +
+                  datePart.substring(4,6) +
+                  "-" +
+                  datePart.substring(6,8) +
+                  "T" +
+                  timePart.substring(0,2) +
+                  ":" +
+                  timePart.substring(2,4) +
+                  ":" +
+                  timePart.substring(4,6);
+              }
+
+              return row.ordered_at;
+            })(),
 
           paidAt:
             row.paid_at,

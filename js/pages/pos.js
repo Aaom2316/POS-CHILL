@@ -96,6 +96,36 @@ POS.pages.pos = async function () {
     // โหลดจาก Backend ทุกครั้งที่เปิดหน้า POS
     // เพื่อไม่ให้ข้อมูลเก่าจาก window.POS / localStorage
     // ทำให้เครื่องอื่นไม่เห็นบิลค้างล่าสุด
+    //
+    // cache นี้ใช้เก็บ "ประวัติการเพิ่ม/ลดจำนวน"
+    // ของเครื่องนี้เท่านั้น ไม่ใช้แทนข้อมูลหลักจาก Backend
+    let cachedPendingBills = [];
+
+    try{
+      const savedHistoryBills =
+        localStorage.getItem(
+          PENDING_BILLS_STORAGE_KEY
+        );
+
+      cachedPendingBills =
+        savedHistoryBills
+          ? JSON.parse(savedHistoryBills)
+          : [];
+
+      if(!Array.isArray(cachedPendingBills)){
+        cachedPendingBills = [];
+      }
+
+    }catch(cacheHistoryError){
+
+      console.error(
+        "LOAD PENDING HISTORY CACHE ERROR:",
+        cacheHistoryError
+      );
+
+      cachedPendingBills = [];
+    }
+
     try{
 
       // ---------------------------------------------
@@ -180,7 +210,92 @@ POS.pages.pos = async function () {
 
               }
 
+              // ---------------------------------------------
+              // ประวัติการเพิ่มจำนวนของรายการนี้
+              // ---------------------------------------------
+              const rowQty =
+                Number(row.qty || 0);
+
+              const rowAt =
+                row.sold_at ||
+                row.created_at ||
+                null;
+
+              const cachedBill =
+                cachedPendingBills.find(
+                  cached =>
+                    String(cached?.billId || "") ===
+                    String(billId)
+                );
+
+              const rowSourceId =
+                row.id ||
+                row.sale_id ||
+                row.order_id ||
+                null;
+
+              const cachedItem =
+                (cachedBill?.items || [])
+                  .find(
+                    cached =>
+                      (
+                        rowSourceId &&
+                        String(cached.sourceId || "") ===
+                        String(rowSourceId)
+                      ) ||
+                      (
+                        !rowSourceId &&
+                        String(cached.sku || "") ===
+                        String(
+                          menu?.sku ||
+                          row.sku ||
+                          ""
+                        )
+                      )
+                  );
+
+              let itemHistory =
+                Array.isArray(cachedItem?.history)
+                  ? cachedItem.history
+                      .map(entry => ({
+                        type:
+                          entry?.type === "ลด"
+                            ? "ลด"
+                            : "เพิ่ม",
+                        qty:
+                          Math.max(
+                            1,
+                            Number(entry?.qty || 0)
+                          ),
+                        at:
+                          entry?.at ||
+                          null
+                      }))
+                      .filter(
+                        entry =>
+                          entry.at
+                      )
+                  : [];
+
+              // ถ้ายังไม่มีประวัติจาก cache
+              // ให้ใช้วัน/เวลาที่ Backend บันทึกรายการนี้
+              if(!itemHistory.length && rowAt){
+
+                itemHistory = [{
+                  type:
+                    "เพิ่ม",
+                  qty:
+                    rowQty,
+                  at:
+                    rowAt
+                }];
+
+              }
+
               bills[billId].items.push({
+
+                sourceId:
+                  rowSourceId,
 
                 sku:
                   menu?.sku ||
@@ -202,9 +317,10 @@ POS.pages.pos = async function () {
                   "🍹",
 
                 qty:
-                  Number(
-                    row.qty || 0
-                  )
+                  rowQty,
+
+                history:
+                  itemHistory
 
               });
 
@@ -1103,6 +1219,51 @@ POS.pages.pos = async function () {
           >
             เพิ่มรายการ
           </button>
+
+        </div>
+
+      </div>
+
+
+      <!-- =================================================
+           PENDING QUANTITY HISTORY MODAL
+           ================================================= -->
+
+      <div
+        id="posPendingQtyHistoryModal"
+        class="pos-pending-qty-history-modal"
+        style="display:none;"
+      >
+
+        <div class="pos-pending-qty-history-box">
+
+          <button
+            type="button"
+            id="posPendingQtyHistoryClose"
+            class="pos-pending-qty-history-close"
+          >
+            ×
+          </button>
+
+          <div
+            id="posPendingQtyHistoryTitle"
+            class="pos-pending-qty-history-title"
+          >
+            📋 รายละเอียดจำนวน
+          </div>
+
+          <div
+            id="posPendingQtyHistoryName"
+            class="pos-pending-qty-history-name"
+          >
+            รายการ
+          </div>
+
+          <div
+            id="posPendingQtyHistoryItems"
+            class="pos-pending-qty-history-items"
+          >
+          </div>
 
         </div>
 
@@ -2733,7 +2894,138 @@ POS.pages.pos = async function () {
   color:#059669;
 }
 
-      </style>
+            /* =================================================
+         PENDING QUANTITY HISTORY
+         ================================================= */
+
+      .pos-pending-detail-controls button.pos-pending-detail-qty-history{
+        min-width:34px;
+        min-height:34px;
+        padding:4px 10px;
+        border:1px solid #bbf7d0 !important;
+        border-radius:10px;
+        background:#ecfdf5 !important;
+        color:#008f68 !important;
+        font-size:17px;
+        font-weight:800;
+        cursor:pointer;
+        font-family:inherit;
+      }
+
+      .pos-pending-detail-qty-history:hover{
+        background:#d1fae5;
+      }
+
+      .pos-pending-detail-qty-history:active{
+        transform:scale(.96);
+      }
+
+      .pos-pending-qty-history-modal{
+        position:fixed;
+        inset:0;
+        background:#00000055;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        z-index:10010;
+        padding:20px;
+      }
+
+      .pos-pending-qty-history-box{
+        position:relative;
+        width:100%;
+        max-width:430px;
+        max-height:85vh;
+        overflow:auto;
+        background:#fff;
+        border-radius:20px;
+        padding:28px 24px;
+        box-shadow:0 15px 40px #00000025;
+      }
+
+      .pos-pending-qty-history-close{
+        position:absolute;
+        right:14px;
+        top:10px;
+        width:38px;
+        height:38px;
+        border:0;
+        background:#f3f4f6;
+        border-radius:50%;
+        font-size:25px;
+        cursor:pointer;
+      }
+
+      .pos-pending-qty-history-title{
+        font-size:21px;
+        font-weight:800;
+        color:#111827;
+        margin-bottom:5px;
+      }
+
+      .pos-pending-qty-history-name{
+        color:#64748b;
+        font-size:15px;
+        font-weight:700;
+        margin-bottom:16px;
+        padding-right:35px;
+      }
+
+      .pos-pending-qty-history-items{
+        max-height:55vh;
+        overflow-y:auto;
+      }
+
+      .pos-pending-qty-history-row{
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:12px;
+        padding:13px 0;
+        border-bottom:1px solid #e5e7eb;
+      }
+
+      .pos-pending-qty-history-row:last-child{
+        border-bottom:0;
+      }
+
+      .pos-pending-qty-history-type{
+        font-size:15px;
+        font-weight:800;
+      }
+
+      .pos-pending-qty-history-type.add{
+        color:#008f68;
+      }
+
+      .pos-pending-qty-history-type.reduce{
+        color:#dc2626;
+      }
+
+      .pos-pending-qty-history-qty{
+        min-width:55px;
+        text-align:center;
+        font-size:16px;
+        font-weight:800;
+      }
+
+      .pos-pending-qty-history-time{
+        color:#475569;
+        font-size:14px;
+        font-weight:700;
+        text-align:right;
+        white-space:nowrap;
+      }
+
+      .pos-pending-qty-history-empty{
+        padding:18px 0;
+        text-align:center;
+        color:#64748b;
+        font-weight:700;
+      }
+
+
+</style>
 
     `;
 
@@ -3341,6 +3633,178 @@ window.POS.updatePendingBillSales =
 
 
       // ===================================================
+      // SHOW PENDING QUANTITY HISTORY
+      // ===================================================
+
+      function showPendingQtyHistory(bill, index){
+
+        const item =
+          bill?.items?.[index];
+
+        if(!item){
+          return;
+        }
+
+        const modal =
+          document.getElementById(
+            "posPendingQtyHistoryModal"
+          );
+
+        const titleEl =
+          document.getElementById(
+            "posPendingQtyHistoryTitle"
+          );
+
+        const nameEl =
+          document.getElementById(
+            "posPendingQtyHistoryName"
+          );
+
+        const itemsEl =
+          document.getElementById(
+            "posPendingQtyHistoryItems"
+          );
+
+        if(
+          !modal ||
+          !itemsEl
+        ){
+          return;
+        }
+
+        if(titleEl){
+          titleEl.textContent =
+            "📋 รายละเอียดจำนวน";
+        }
+
+        if(nameEl){
+          nameEl.textContent =
+            `${item.emoji || "🍹"} ${item.name}`;
+        }
+
+        const history =
+          Array.isArray(item.history)
+            ? item.history
+                .filter(
+                  entry =>
+                    entry &&
+                    entry.at
+                )
+                .slice()
+                .sort(
+                  (a,b) =>
+                    new Date(a.at) -
+                    new Date(b.at)
+                )
+            : [];
+
+        if(!history.length){
+
+          itemsEl.innerHTML = `
+            <div class="pos-pending-qty-history-empty">
+              ยังไม่มีข้อมูลวัน/เวลา
+            </div>
+          `;
+
+        }else{
+
+          itemsEl.innerHTML =
+            history.map(entry => {
+
+              const type =
+                entry.type === "ลด"
+                  ? "ลด"
+                  : "เพิ่ม";
+
+              const qty =
+                Math.max(
+                  1,
+                  Number(entry.qty || 0)
+                );
+
+              let timeText =
+                String(entry.at || "-");
+
+              try{
+
+                const date =
+                  new Date(entry.at);
+
+                if(!Number.isNaN(date.getTime())){
+
+                  timeText =
+                    date.toLocaleString(
+                      "th-TH",
+                      {
+                        timeZone:
+                          "Asia/Bangkok",
+                        year:
+                          "numeric",
+                        month:
+                          "2-digit",
+                        day:
+                          "2-digit",
+                        hour:
+                          "2-digit",
+                        minute:
+                          "2-digit",
+                        second:
+                          "2-digit",
+                        hour12:
+                          false
+                      }
+                    );
+
+                }
+
+              }catch(error){
+
+                console.error(
+                  "FORMAT PENDING HISTORY TIME ERROR:",
+                  error
+                );
+
+              }
+
+              return `
+                <div
+                  class="pos-pending-qty-history-row"
+                >
+
+                  <div
+                    class="
+                      pos-pending-qty-history-type
+                      ${type === "ลด" ? "reduce" : "add"}
+                    "
+                  >
+                    ${type}
+                  </div>
+
+                  <div
+                    class="pos-pending-qty-history-qty"
+                  >
+                    ${type === "ลด" ? "-" : "+"}${qty}
+                  </div>
+
+                  <div
+                    class="pos-pending-qty-history-time"
+                  >
+                    ${timeText} น.
+                  </div>
+
+                </div>
+              `;
+
+            }).join("");
+
+        }
+
+        modal.style.display =
+          "flex";
+      }
+
+
+      // ===================================================
       // OPEN PENDING BILL DETAIL
       // ===================================================
 
@@ -3575,11 +4039,14 @@ window.POS.updatePendingBillSales =
           </button>
 
 
-          <strong
-            class="pos-pending-detail-qty-value"
+          <button
+            type="button"
+            class="pos-pending-detail-qty-history"
+            data-index="${index}"
+            title="กดดูวันและเวลาที่เพิ่มจำนวน"
           >
             ${item.qty}
-          </strong>
+          </button>
 
 
           <button
@@ -3624,6 +4091,37 @@ window.POS.updatePendingBillSales =
 
         totalEl.textContent =
           `${Number(bill.total || 0).toLocaleString("th-TH")} บาท`;
+
+
+        // =================================================
+        // กดจำนวนเพื่อดูประวัติวัน / เวลา
+        // =================================================
+
+        itemsEl
+          .querySelectorAll(
+            ".pos-pending-detail-qty-history"
+          )
+          .forEach(button => {
+
+            button.onclick =
+              event => {
+
+                event.preventDefault();
+                event.stopPropagation();
+
+                const index =
+                  Number(
+                    button.dataset.index
+                  );
+
+                showPendingQtyHistory(
+                  bill,
+                  index
+                );
+
+              };
+
+          });
 
 
         // -----------------------------------------------
@@ -3687,6 +4185,24 @@ if(oldQty <= 1){
 
 item.qty =
   oldQty - 1;
+
+
+// -----------------------------------------------
+// บันทึกประวัติการลดจำนวน
+// -----------------------------------------------
+
+if(!Array.isArray(item.history)){
+  item.history = [];
+}
+
+item.history.push({
+  type:
+    "ลด",
+  qty:
+    1,
+  at:
+    new Date().toISOString()
+});
 
 
 bill.total =
@@ -3819,6 +4335,24 @@ window.POS
 
 item.qty =
   oldQty + 1;
+
+
+// -----------------------------------------------
+// บันทึกประวัติการเพิ่มจำนวน
+// -----------------------------------------------
+
+if(!Array.isArray(item.history)){
+  item.history = [];
+}
+
+item.history.push({
+  type:
+    "เพิ่ม",
+  qty:
+    1,
+  at:
+    new Date().toISOString()
+});
 
 
 bill.total =
@@ -4467,6 +5001,60 @@ if(initialPendingPanel){
       }
 
       // ===================================================
+      // CLOSE PENDING QUANTITY HISTORY MODAL
+      // ===================================================
+
+      const pendingQtyHistoryModal =
+        document.getElementById(
+          "posPendingQtyHistoryModal"
+        );
+
+      const pendingQtyHistoryClose =
+        document.getElementById(
+          "posPendingQtyHistoryClose"
+        );
+
+      if(pendingQtyHistoryClose){
+
+        pendingQtyHistoryClose.addEventListener(
+          "click",
+          () => {
+
+            if(pendingQtyHistoryModal){
+
+              pendingQtyHistoryModal.style.display =
+                "none";
+
+            }
+
+          }
+        );
+
+      }
+
+      if(pendingQtyHistoryModal){
+
+        pendingQtyHistoryModal.addEventListener(
+          "click",
+          event => {
+
+            if(
+              event.target ===
+              pendingQtyHistoryModal
+            ){
+
+              pendingQtyHistoryModal.style.display =
+                "none";
+
+            }
+
+          }
+        );
+
+      }
+
+
+      // ===================================================
       // CLOSE PENDING BILL MODAL
       // ===================================================
 
@@ -4816,6 +5404,23 @@ if(qtyMode){
             Number(existing.qty || 0) +
             addQty;
 
+          // ---------------------------------------------
+          // บันทึกประวัติการเพิ่มจำนวน
+          // ใช้วันทำการ + เวลาจริงทันที
+          // ---------------------------------------------
+          if(!Array.isArray(existing.history)){
+            existing.history = [];
+          }
+
+          existing.history.push({
+            type:
+              "เพิ่ม",
+            qty:
+              addQty,
+            at:
+              getBusinessDateTime()
+          });
+
         }else{
 
           bill.items.push({
@@ -4833,7 +5438,20 @@ if(qtyMode){
               selectedMenu.emoji || "🍹",
 
             qty:
-              addQty
+              addQty,
+
+            // ---------------------------------------------
+            // ประวัติรายการที่เพิ่งเพิ่มเข้าบิล
+            // ต้องแสดงทันทีโดยไม่ต้องรีเฟรช
+            // ---------------------------------------------
+            history: [{
+              type:
+                "เพิ่ม",
+              qty:
+                addQty,
+              at:
+                getBusinessDateTime()
+            }]
 
           });
 
@@ -5208,7 +5826,23 @@ pendingBtn.addEventListener(
           item.emoji || "🍹",
 
         qty:
-          Number(item.qty || 0)
+          Number(item.qty || 0),
+
+        // ---------------------------------------------
+        // ประวัติครั้งแรกทันทีที่สร้างบิลค้าง
+        // ใช้วันทำการ + เวลาจริง
+        // เพื่อให้กดดูประวัติได้ทันทีโดยไม่ต้อง Refresh
+        // ---------------------------------------------
+        history: [{
+          type:
+            "เพิ่ม",
+
+          qty:
+            Number(item.qty || 0),
+
+          at:
+            getBusinessDateTime()
+        }]
 
       }));
 
