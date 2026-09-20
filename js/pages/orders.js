@@ -228,6 +228,7 @@ POS.ordersLoadDatabase = async function(force = false){
             return {
               orderId: row.id,
               billId: String(row.remark || "").trim(),
+              customerName: String(row.customer_name || "").trim(),
               id: row.menu_id,
               sku: menu.sku || "",
               name: menu.name || "ไม่พบชื่อเมนู",
@@ -478,7 +479,7 @@ POS.ordersOpenTable = async function(table){
   const currentBillId = String(POS.tableBillIds?.[Number(table)] || "").trim();
   const savedCustomerName = POS.tableCustomerNames?.[`${Number(table)}|${currentBillId}`] || "";
   if(customerInput) customerInput.value = savedCustomerName;
-  if(customerStatus) customerStatus.textContent = savedCustomerName ? `ชื่อลูกค้า: ${savedCustomerName}` : "ชื่อจะผูกกับบิลของโต๊ะนี้";
+  if(customerStatus) customerStatus.textContent = savedCustomerName ? `ชื่อลูกค้า: ${savedCustomerName}` : "กำลังโหลดชื่อลูกค้าจากบิล...";
 
   detailTable.textContent =
     "โต๊ะ " + table;
@@ -496,9 +497,41 @@ POS.ordersOpenTable = async function(table){
   POS.ordersRenderCart();
 
   POS.ordersLoadDatabase(true)
-    .then(() => {
+    .then(async () => {
       POS.ordersRenderCart();
       POS.ordersRenderTables();
+
+      // โหลดชื่อจาก Database ใหม่ทุกครั้งที่เปิดโต๊ะ
+      // เพื่อให้ชื่อยังอยู่หลังรีเฟรชหน้าเว็บ (ไม่พึ่ง memory cache)
+      const activeTable = Number(table);
+      const activeBillId = String(POS.tableBillIds?.[activeTable] || "").trim();
+      if(!activeBillId) {
+        if(customerInput) customerInput.value = "";
+        if(customerStatus) customerStatus.textContent = "ชื่อจะผูกกับบิลของโต๊ะนี้";
+        return;
+      }
+
+      // ใช้ customer_name ที่ Orders Backend ส่งมากับ LIST
+      // ไม่ query ตาราง orders จาก Browser โดยตรง (อาจติด RLS)
+      const dbCustomerName = String(
+        (POS.tableOrders?.[activeTable] || [])
+          .find(item =>
+            String(item.billId || "").trim() === activeBillId &&
+            String(item.customerName || "").trim()
+          )?.customerName || ""
+      ).trim();
+
+      POS.tableCustomerNames = POS.tableCustomerNames || {};
+      POS.tableCustomerNames[`${activeTable}|${activeBillId}`] = dbCustomerName;
+
+      // ป้องกันผลโหลดเก่ามาทับชื่อ หากผู้ใช้เปลี่ยนโต๊ะระหว่างโหลด
+      if(Number(POS.currentTable) === activeTable &&
+         String(POS.tableBillIds?.[activeTable] || "").trim() === activeBillId) {
+        if(customerInput) customerInput.value = dbCustomerName;
+        if(customerStatus) customerStatus.textContent = dbCustomerName
+          ? `ชื่อลูกค้า: ${dbCustomerName}`
+          : "ชื่อจะผูกกับบิลของโต๊ะนี้";
+      }
     })
     .catch(error => {
       console.warn(
