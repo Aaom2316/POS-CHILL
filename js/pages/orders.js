@@ -473,6 +473,13 @@ POS.ordersOpenTable = async function(table){
 
   POS.currentTable = Number(table);
 
+  const customerInput = document.getElementById("ordersCustomerName");
+  const customerStatus = document.getElementById("ordersCustomerNameStatus");
+  const currentBillId = String(POS.tableBillIds?.[Number(table)] || "").trim();
+  const savedCustomerName = POS.tableCustomerNames?.[`${Number(table)}|${currentBillId}`] || "";
+  if(customerInput) customerInput.value = savedCustomerName;
+  if(customerStatus) customerStatus.textContent = savedCustomerName ? `ชื่อลูกค้า: ${savedCustomerName}` : "ชื่อจะผูกกับบิลของโต๊ะนี้";
+
   detailTable.textContent =
     "โต๊ะ " + table;
 
@@ -502,6 +509,39 @@ POS.ordersOpenTable = async function(table){
 
   POS.ordersRenderTables();
 
+};
+
+
+/* =====================================================
+   ORDERS : บันทึกชื่อลูกค้าผูกกับโต๊ะ + bill_id
+   ใช้ Backend Action SET_CUSTOMER_NAME
+   ===================================================== */
+POS.ordersSaveCustomerName = async function(){
+  const table = Number(POS.currentTable || 0);
+  const billId = String(POS.tableBillIds?.[table] || "").trim();
+  const input = document.getElementById("ordersCustomerName");
+  const status = document.getElementById("ordersCustomerNameStatus");
+  const customerName = String(input?.value || "").trim();
+
+  if(!table || !billId){
+    await POS.ordersShowDialog({type:"error",title:"ยังไม่มีเลขบิล",message:"กรุณาเพิ่มรายการในโต๊ะก่อน แล้วจึงบันทึกชื่อลูกค้า"});
+    return;
+  }
+  if(status) status.textContent = "กำลังบันทึกชื่อ...";
+  try{
+    const result = await POS.api.call(
+      POS_CONFIG.FUNCTION_NAMES.ORDERS,
+      {method:"POST",body:{action:"SET_CUSTOMER_NAME",table_no:table,bill_id:billId,customer_name:customerName}}
+    );
+    if(!result || result.success !== true) throw new Error(result?.error || "บันทึกชื่อลูกค้าไม่สำเร็จ");
+    POS.tableCustomerNames = POS.tableCustomerNames || {};
+    POS.tableCustomerNames[`${table}|${billId}`] = customerName;
+    if(status) status.textContent = customerName ? `บันทึกชื่อ “${customerName}” แล้ว` : "ล้างชื่อลูกค้าแล้ว";
+  }catch(error){
+    console.error("SAVE CUSTOMER NAME ERROR:",error);
+    if(status) status.textContent = "บันทึกไม่สำเร็จ กรุณาลองอีกครั้ง";
+    await POS.ordersShowDialog({type:"error",title:"บันทึกชื่อไม่สำเร็จ",message:error?.message || "กรุณาลองอีกครั้ง"});
+  }
 };
 
 
@@ -2858,11 +2898,34 @@ POS.pages.orders = function(){
     <button
       type="button"
       class="pos-tab"
+      data-orders-tab="pending"
+    >
+      🟡 ค้างจ่าย
+    </button>
+
+    <button
+      type="button"
+      class="pos-tab"
       data-orders-tab="paid"
     >
       🧾 รายการบิลขายแล้ว
     </button>
 
+  </div>
+
+
+  <div
+    id="ordersPendingArea"
+    class="panel"
+    style="display:none;"
+  >
+    <div class="pos-pending-header">
+      <h2 class="pos-pending-title">🟡 บิลค้างจ่าย</h2>
+      <div id="ordersPendingCount" class="pos-pending-count">0 บิล</div>
+    </div>
+    <div id="ordersPendingBills">
+      <div class="pos-cart-empty">ยังไม่มีบิลค้างจ่าย</div>
+    </div>
   </div>
 
 
@@ -3030,6 +3093,15 @@ POS.pages.orders = function(){
 
       <div class="orders-detail-content">
 
+        <div style="margin:0 0 16px;padding:14px;border:1px solid #dbeafe;border-radius:12px;background:#eff6ff;">
+          <label for="ordersCustomerName" style="display:block;font-weight:800;margin-bottom:7px;color:#1e3a8a;">👤 ชื่อลูกค้า (ถ้ามี)</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <input id="ordersCustomerName" type="text" maxlength="120" placeholder="กรอกชื่อลูกค้า" style="flex:1;min-width:180px;padding:11px 12px;border:1px solid #bfdbfe;border-radius:9px;font-size:16px;box-sizing:border-box;" />
+            <button type="button" onclick="POS.ordersSaveCustomerName()" style="padding:11px 16px;border:0;border-radius:9px;background:#2563eb;color:#fff;font-weight:800;cursor:pointer;">บันทึกชื่อ</button>
+          </div>
+          <small id="ordersCustomerNameStatus" style="display:block;margin-top:6px;color:#64748b;">ชื่อจะผูกกับบิลของโต๊ะนี้</small>
+        </div>
+
         <h2>
           รายการในโต๊ะ
         </h2>
@@ -3076,6 +3148,15 @@ POS.pages.orders = function(){
               </button> 
           
           
+              <button
+                type="button"
+                class="orders-park-btn"
+                onclick="POS.ordersParkBill()"
+              >
+                <span class="orders-btn-icon">🟡</span>
+                <span>ค้างจ่าย</span>
+              </button>
+
               <button 
                 type="button" 
                 class="orders-payment-btn" 
@@ -3849,6 +3930,22 @@ POS.pages.orders = function(){
         cursor:pointer;
       }
 
+      .orders-park-btn{
+        border:0;
+        border-radius:12px;
+        padding:15px 20px;
+        background:#fef3c7;
+        color:#92400e;
+        font-family:inherit;
+        font-size:17px;
+        font-weight:800;
+        cursor:pointer;
+      }
+
+      .orders-park-btn:active{
+        transform:scale(.98);
+      }
+
       .orders-payment-btn{
         border:0;
         border-radius:12px;
@@ -4255,6 +4352,21 @@ POS.pages.orders = function(){
    ORDERS PAID HEADER
    ===================================================== */
 
+.orders-pending-bill-card{
+  display:block;
+  width:100%;
+  text-align:left;
+  border:1px solid #e5e7eb;
+  border-radius:14px;
+  background:#fff;
+  padding:18px 20px;
+  margin:12px 0;
+  cursor:pointer;
+  font-family:inherit;
+  box-shadow:0 3px 12px #0000000a;
+}
+.orders-pending-bill-card:hover{background:#fffbeb;border-color:#fde68a;}
+
 #ordersPaidArea .pos-pending-header{
   display: flex;
   align-items: center;
@@ -4285,6 +4397,419 @@ POS.pages.orders = function(){
 // ใช้เฉพาะ Orders Database
 // ไม่ปน Sales
 // =====================================================
+
+// =====================================================
+// ORDERS : พักบิลค้างจ่าย แล้วคืนโต๊ะให้ว่าง
+// =====================================================
+
+// =====================================================
+// ORDERS : MODERN CONFIRM / ALERT DIALOG
+// ใช้แทนหน้าต่าง alert() และ confirm() ของ Browser
+// จำกัดขอบเขตเฉพาะหน้า Orders
+// =====================================================
+
+POS.ordersShowDialog = function(options = {}){
+  return new Promise(resolve => {
+    // ป้องกัน Dialog ซ้อนกัน
+    document.getElementById("ordersModernDialogOverlay")?.remove();
+
+    const type = options.type || "info";
+    const isConfirm = type === "confirm";
+    const isSuccess = type === "success";
+    const isError = type === "error";
+
+    const icon = isConfirm ? "❔" : isSuccess ? "✅" : isError ? "⚠️" : "ℹ️";
+    const accent = isConfirm ? "#2563eb" : isSuccess ? "#059669" : isError ? "#dc2626" : "#64748b";
+    const title = options.title || (isConfirm ? "ยืนยันรายการ" : isSuccess ? "ดำเนินการสำเร็จ" : isError ? "เกิดข้อผิดพลาด" : "แจ้งเตือน");
+
+    const overlay = document.createElement("div");
+    overlay.id = "ordersModernDialogOverlay";
+    overlay.style.cssText = [
+      "position:fixed", "inset:0", "z-index:200000", "display:flex",
+      "align-items:center", "justify-content:center", "padding:18px",
+      "background:rgba(15,23,42,.48)", "backdrop-filter:blur(4px)",
+      "-webkit-backdrop-filter:blur(4px)"
+    ].join(";");
+
+    const panel = document.createElement("div");
+    panel.setAttribute("role", "dialog");
+    panel.setAttribute("aria-modal", "true");
+    panel.style.cssText = [
+      "width:100%", "max-width:440px", "box-sizing:border-box",
+      "background:#fff", "border:1px solid #e5e7eb", "border-radius:22px",
+      "padding:26px", "box-shadow:0 24px 70px rgba(15,23,42,.25)",
+      "font-family:inherit", "animation:ordersDialogIn .18s ease-out"
+    ].join(";");
+
+    const header = document.createElement("div");
+    header.style.cssText = "display:flex;align-items:center;gap:13px;margin-bottom:16px;";
+
+    const iconBox = document.createElement("div");
+    iconBox.textContent = icon;
+    iconBox.style.cssText = `width:48px;height:48px;flex:0 0 48px;display:flex;align-items:center;justify-content:center;border-radius:15px;background:${accent}18;font-size:25px;`;
+
+    const heading = document.createElement("div");
+    heading.textContent = title;
+    heading.style.cssText = "font-size:21px;font-weight:800;color:#172033;line-height:1.35;";
+    header.append(iconBox, heading);
+
+    const message = document.createElement("div");
+    message.textContent = String(options.message || "");
+    message.style.cssText = "white-space:pre-line;overflow-wrap:anywhere;font-size:15px;line-height:1.75;color:#475569;margin:0 0 24px 2px;";
+
+    const actions = document.createElement("div");
+    actions.style.cssText = "display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;";
+
+    const makeButton = (label, primary) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = label;
+      button.style.cssText = `min-width:100px;border:1px solid ${primary ? accent : "#e2e8f0"};border-radius:12px;padding:12px 18px;background:${primary ? accent : "#f8fafc"};color:${primary ? "#fff" : "#334155"};font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;transition:filter .15s;`;
+      button.addEventListener("mouseenter", () => button.style.filter = "brightness(.96)");
+      button.addEventListener("mouseleave", () => button.style.filter = "none");
+      return button;
+    };
+
+    let finished = false;
+    const close = value => {
+      if(finished) return;
+      finished = true;
+      document.removeEventListener("keydown", onKeyDown);
+      overlay.remove();
+      resolve(value);
+    };
+    const onKeyDown = event => {
+      if(event.key === "Escape") close(false);
+    };
+
+    if(isConfirm){
+      const cancel = makeButton(options.cancelText || "ยกเลิก", false);
+      cancel.addEventListener("click", () => close(false));
+      actions.appendChild(cancel);
+    }
+
+    const ok = makeButton(options.confirmText || (isConfirm ? "ยืนยัน" : "ตกลง"), true);
+    ok.addEventListener("click", () => close(true));
+    actions.appendChild(ok);
+
+    panel.append(header, message, actions);
+    overlay.appendChild(panel);
+    overlay.addEventListener("click", event => {
+      if(event.target === overlay) close(false);
+    });
+
+    if(!document.getElementById("ordersModernDialogStyle")){
+      const style = document.createElement("style");
+      style.id = "ordersModernDialogStyle";
+      style.textContent = "@keyframes ordersDialogIn{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}@media(max-width:480px){#ordersModernDialogOverlay>div{padding:21px!important;border-radius:18px!important}}";
+      document.head.appendChild(style);
+    }
+
+    document.body.appendChild(overlay);
+    document.addEventListener("keydown", onKeyDown);
+    ok.focus();
+  });
+};
+
+POS.ordersParkBill = async function(){
+
+  const table = Number(POS.currentTable);
+  const items = POS.tableOrders?.[table] || [];
+
+  if(!table || !items.length){
+    await POS.ordersShowDialog({ type:"info", title:"ไม่มีรายการในโต๊ะ", message:"โต๊ะนี้ยังไม่มีรายการให้พักบิล" });
+    return;
+  }
+
+  const billId = String(
+    POS.tableBillIds?.[table] || items[0]?.billId || ""
+  ).trim();
+
+  if(!billId){
+    await POS.ordersShowDialog({ type:"error", title:"ไม่พบเลขบิล", message:"ไม่พบเลขบิลของโต๊ะนี้" });
+    return;
+  }
+
+  if(POS.__ordersParking) return;
+
+  const confirmed = await POS.ordersShowDialog({
+    type:"confirm",
+    title:"ยืนยันพักบิลค้างจ่าย",
+    message:`พักบิล ${billId} ของโต๊ะ ${table} ใช่หรือไม่?\n\nระบบจะย้ายบิลไปแท็บค้างจ่าย และคืนโต๊ะให้ว่าง`,
+    confirmText:"ยืนยันพักบิล",
+    cancelText:"ยกเลิก"
+  });
+  if(!confirmed) return;
+
+  POS.__ordersParking = true;
+
+  try{
+    const result = await POS.api.call(
+      POS_CONFIG.FUNCTION_NAMES.ORDERS,
+      {
+        method:"POST",
+        body:{ action:"PARK", table_no:table, bill_id:billId }
+      }
+    );
+
+    if(!result || result.success !== true){
+      throw new Error(result?.error || "พักบิลไม่สำเร็จ");
+    }
+
+    // เคลียร์เฉพาะ state โต๊ะ หลัง Backend ยืนยันสำเร็จ
+    POS.tableOrders[table] = [];
+    if(POS.tableBillIds) delete POS.tableBillIds[table];
+    POS.ordersSaveStorage();
+
+    const detailArea = document.getElementById("ordersDetailArea");
+    const tableArea = document.getElementById("ordersTableArea");
+    const menuArea = document.getElementById("ordersMenuArea");
+    if(detailArea) detailArea.style.display = "none";
+    if(menuArea) menuArea.style.display = "none";
+    if(tableArea) tableArea.style.display = "block";
+    POS.currentTable = null;
+
+    await POS.ordersLoadDatabase(true);
+    POS.ordersRenderTables();
+    await POS.ordersShowDialog({ type:"success", title:"พักบิลสำเร็จ", message:`พักบิล ${billId} เรียบร้อย\nโต๊ะ ${table} ว่างแล้ว` });
+
+  }catch(error){
+    console.error("ORDERS PARK BILL ERROR:", error);
+    await POS.ordersShowDialog({ type:"error", title:"พักบิลไม่สำเร็จ", message:error?.message || "กรุณาลองใหม่อีกครั้ง" });
+  }finally{
+    POS.__ordersParking = false;
+  }
+};
+
+
+// =====================================================
+// ORDERS : แสดงบิลค้างจ่าย แยกตามโต๊ะ/เลขบิล
+// =====================================================
+
+POS.ordersRenderPendingBills = async function(){
+
+  const area = document.getElementById("ordersPendingBills");
+  const count = document.getElementById("ordersPendingCount");
+  if(!area) return;
+
+  area.innerHTML = '<div class="pos-cart-empty">กำลังโหลดบิลค้างจ่าย...</div>';
+
+  try{
+    const result = await POS.api.call(
+      POS_CONFIG.FUNCTION_NAMES.ORDERS,
+      { method:"POST", body:{ action:"PENDING_LIST" } }
+    );
+
+    if(!result || result.success !== true){
+      throw new Error(result?.error || "โหลดบิลค้างจ่ายไม่สำเร็จ");
+    }
+
+    const rows = Array.isArray(result.orders) ? result.orders : [];
+
+    // โหลดชื่อลูกค้าจาก orders โดยตรง เพื่อให้หน้าค้างจ่ายแสดงชื่อได้
+    // แม้ PENDING_LIST จะยังไม่ได้ส่ง customer_name กลับมา
+    const customerNameMap = {};
+    try{
+      const customerResult = await POS.supabase
+        .from("orders")
+        .select("table_no,remark,customer_name")
+        .eq("payment_status", "UNPAID");
+
+      if(!customerResult.error && Array.isArray(customerResult.data)){
+        customerResult.data.forEach(row => {
+          const key = `${Number(row.table_no || 0)}|${String(row.remark || "").trim()}`;
+          const name = String(row.customer_name || "").trim();
+          if(key && name && !customerNameMap[key]) customerNameMap[key] = name;
+        });
+      }
+    }catch(customerError){
+      console.warn("LOAD PENDING CUSTOMER NAMES ERROR:", customerError);
+    }
+
+    const escapeHtml = value => String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+
+    let menuMap = POS.__ordersMenuMap || null;
+    if(!menuMap){
+      const menuResult = await POS.api.menus();
+      menuMap = {};
+      (Array.isArray(menuResult?.menus) ? menuResult.menus : []).forEach(menu => {
+        menuMap[String(menu.id)] = menu;
+      });
+      POS.__ordersMenuMap = menuMap;
+    }
+
+    const groups = {};
+    rows.forEach(row => {
+      const billId = String(row.remark || "").trim();
+      if(!billId) return;
+      const tableNo = Number(row.table_no || 0);
+      const key = `${tableNo}|${billId}`;
+      if(!groups[key]) groups[key] = {
+        tableNo,
+        billId,
+        customerName: customerNameMap[key] || String(row.customer_name || "").trim(),
+        items:[],
+        total:0,
+        qty:0
+      };
+      const menu = menuMap[String(row.menu_id)] || {};
+      const qty = Number(row.qty || 0);
+      const price = Number(row.unit_price ?? menu.price ?? 0);
+      groups[key].items.push({
+        name:menu.name || "ไม่พบชื่อเมนู",
+        emoji:menu.emoji || "🍹",
+        qty,
+        price,
+        total:qty * price
+      });
+      groups[key].qty += qty;
+      groups[key].total += qty * price;
+    });
+
+    const bills = Object.values(groups).sort((a,b) => a.tableNo-b.tableNo || a.billId.localeCompare(b.billId));
+    if(count) count.textContent = `${bills.length} บิล`;
+
+    if(!bills.length){
+      area.innerHTML = '<div class="pos-cart-empty">ยังไม่มีบิลค้างจ่าย</div>';
+      return;
+    }
+
+    area.innerHTML = bills.map(bill => `
+      <button type="button" class="orders-pending-bill-card"
+        onclick="POS.ordersOpenPendingBill('${bill.billId.replace(/'/g, "\\'")}')">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+          <strong style="font-size:20px;color:#111827;">🪑 โต๊ะ ${bill.tableNo}</strong>
+          <strong style="font-size:20px;color:#008f68;">${bill.total.toLocaleString("th-TH")} บาท</strong>
+        </div>
+        <div style="margin-top:7px;color:#64748b;font-size:14px;">บิล ${bill.billId} · ${bill.qty} รายการ</div>
+        <div style="margin-top:7px;color:#334155;font-size:15px;font-weight:700;">👤 ${bill.customerName ? escapeHtml(bill.customerName) : "ยังไม่ได้ระบุชื่อลูกค้า"}</div>
+        <div style="margin-top:8px;color:#92400e;font-weight:700;">🟡 ค้างจ่าย · กดดูรายละเอียด/รับชำระ</div>
+      </button>
+    `).join("");
+
+  }catch(error){
+    console.error("LOAD PENDING BILLS ERROR:", error);
+    area.innerHTML = `<div class="pos-cart-empty">โหลดบิลค้างจ่ายไม่สำเร็จ<br>${error?.message || ""}</div>`;
+  }
+};
+
+
+// =====================================================
+// ORDERS : เปิดรายละเอียดบิลค้างจ่ายและรับชำระ
+// =====================================================
+
+POS.ordersOpenPendingBill = async function(billId){
+
+  const result = await POS.api.call(
+    POS_CONFIG.FUNCTION_NAMES.ORDERS,
+    { method:"POST", body:{ action:"PENDING_LIST" } }
+  );
+  if(!result || result.success !== true){
+    await POS.ordersShowDialog({ type:"error", title:"โหลดบิลไม่สำเร็จ", message:result?.error || "กรุณาลองใหม่อีกครั้ง" });
+    return;
+  }
+
+  const rows = (Array.isArray(result.orders) ? result.orders : [])
+    .filter(row => String(row.remark || "").trim() === String(billId));
+  if(!rows.length){
+    await POS.ordersShowDialog({ type:"info", title:"ไม่พบบิลค้างจ่าย", message:"ไม่พบบิลค้างจ่ายนี้ อาจมีการรับชำระไปแล้ว" });
+    POS.ordersRenderPendingBills();
+    return;
+  }
+
+  const tableNo = Number(rows[0].table_no || 0);
+
+  let customerName = String(rows[0].customer_name || "").trim();
+  try{
+    const customerResult = await POS.supabase
+      .from("orders")
+      .select("customer_name")
+      .eq("table_no", tableNo)
+      .eq("remark", String(billId))
+      .eq("payment_status", "UNPAID")
+      .limit(1);
+
+    if(!customerResult.error && Array.isArray(customerResult.data) && customerResult.data.length){
+      customerName = String(customerResult.data[0].customer_name || customerName).trim();
+    }
+  }catch(customerError){
+    console.warn("LOAD PENDING BILL CUSTOMER NAME ERROR:", customerError);
+  }
+
+  const escapeHtml = value => String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
+  const menuResult = await POS.api.menus();
+  const menuMap = {};
+  (Array.isArray(menuResult?.menus) ? menuResult.menus : []).forEach(menu => menuMap[String(menu.id)] = menu);
+  const itemsHtml = rows.map(row => {
+    const menu = menuMap[String(row.menu_id)] || {};
+    const qty = Number(row.qty || 0);
+    const price = Number(row.unit_price ?? menu.price ?? 0);
+    return `<div style="display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #eee;">
+      <span>${menu.emoji || "🍹"} ${menu.name || "ไม่พบชื่อเมนู"} × ${qty}</span>
+      <strong>${(qty*price).toLocaleString("th-TH")} บาท</strong>
+    </div>`;
+  }).join("");
+  const total = rows.reduce((sum,row) => sum + Number(row.qty || 0) * Number(row.unit_price || 0),0);
+
+  const modal = document.createElement("div");
+  modal.id = "ordersPendingBillDetailModal";
+  modal.style.cssText = "position:fixed;inset:0;background:#0008;display:flex;align-items:center;justify-content:center;z-index:100000;padding:16px;";
+  modal.innerHTML = `<div style="background:#fff;width:100%;max-width:560px;max-height:90vh;overflow:auto;border-radius:18px;padding:24px;box-sizing:border-box;">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+      <h2 style="margin:0;color:#111827;">🟡 บิลค้างจ่าย</h2>
+      <button type="button" onclick="document.getElementById('ordersPendingBillDetailModal')?.remove()" style="border:0;border-radius:50%;padding:8px 12px;cursor:pointer;">✕</button>
+    </div>
+    <div style="margin-top:8px;color:#64748b;">โต๊ะ ${tableNo} · บิล ${billId}</div>
+    <div style="margin-top:10px;padding:10px 12px;border-radius:9px;background:#f8fafc;color:#334155;font-weight:700;">👤 ชื่อลูกค้า: ${customerName ? escapeHtml(customerName) : "ยังไม่ได้ระบุชื่อลูกค้า"}</div>
+    <div style="margin-top:16px;">${itemsHtml}</div>
+    <div style="display:flex;justify-content:space-between;margin-top:18px;font-size:21px;font-weight:900;color:#008f68;">
+      <span>ยอดรวม</span><span>${total.toLocaleString("th-TH")} บาท</span>
+    </div>
+    <button type="button" onclick="POS.ordersPayPendingBill(${tableNo}, '${billId.replace(/'/g, "\\'")}')" style="width:100%;margin-top:18px;border:0;border-radius:12px;padding:15px;background:#dcfce7;color:#166534;font-size:17px;font-weight:800;cursor:pointer;">💵 รับชำระบิลนี้</button>
+  </div>`;
+  document.getElementById("ordersPendingBillDetailModal")?.remove();
+  document.body.appendChild(modal);
+};
+
+
+POS.ordersPayPendingBill = async function(tableNo, billId){
+  if(POS.__ordersPayingPending) return;
+  const confirmed = await POS.ordersShowDialog({
+    type:"confirm",
+    title:"ยืนยันรับชำระ",
+    message:`ยืนยันรับชำระบิล ${billId} ของโต๊ะ ${tableNo} ใช่หรือไม่?`,
+    confirmText:"ยืนยันรับชำระ",
+    cancelText:"กลับไปตรวจสอบ"
+  });
+  if(!confirmed) return;
+  POS.__ordersPayingPending = true;
+  try{
+    const result = await POS.api.orderPay(Number(tableNo), String(billId));
+    if(!result || result.success !== true) throw new Error(result?.error || "รับชำระไม่สำเร็จ");
+    document.getElementById("ordersPendingBillDetailModal")?.remove();
+    await POS.ordersRenderPendingBills();
+    await POS.ordersLoadDatabase(true);
+    POS.ordersRenderTables();
+    await POS.ordersShowDialog({ type:"success", title:"รับชำระสำเร็จ", message:`รับชำระบิล ${billId} เรียบร้อยแล้ว` });
+  }catch(error){
+    console.error("PAY PENDING BILL ERROR:", error);
+    await POS.ordersShowDialog({ type:"error", title:"รับชำระไม่สำเร็จ", message:error?.message || "กรุณาลองใหม่อีกครั้ง" });
+  }finally{
+    POS.__ordersPayingPending = false;
+  }
+};
+
 
 POS.ordersLoadPaidBills = async function(){
 
@@ -4760,6 +5285,11 @@ if(!window.POS.ordersTabsBound){
           "ordersPaidArea"
         );
 
+      const pendingArea =
+        document.getElementById(
+          "ordersPendingArea"
+        );
+
 
       // -----------------------------------------------
       // เปลี่ยน active tab
@@ -4788,6 +5318,10 @@ if(!window.POS.ordersTabsBound){
       // -----------------------------------------------
 
       if(tabName === "tables"){
+
+  if(pendingArea){
+    pendingArea.style.display = "none";
+  }
 
   if(paidArea){
     paidArea.style.display =
@@ -4851,10 +5385,38 @@ if(!window.POS.ordersTabsBound){
 
 
       // -----------------------------------------------
+      // TAB : ค้างจ่าย
+      // -----------------------------------------------
+
+      if(tabName === "pending"){
+
+        if(tableArea){
+          const tableTitle = tableArea.querySelector(".orders-title");
+          const tableGrid = tableArea.querySelector(".orders-table-grid");
+          if(tableTitle) tableTitle.style.display = "none";
+          if(tableGrid) tableGrid.style.display = "none";
+        }
+
+        if(detailArea) detailArea.style.display = "none";
+        if(menuArea) menuArea.style.display = "none";
+        if(paidArea) paidArea.style.display = "none";
+        if(pendingArea) pendingArea.style.display = "block";
+
+        POS.currentTable = null;
+        POS.ordersRenderPendingBills();
+        return;
+      }
+
+
+      // -----------------------------------------------
       // TAB : รายการบิลขายแล้ว
       // -----------------------------------------------
 
       if(tabName === "paid"){
+
+  if(pendingArea){
+    pendingArea.style.display = "none";
+  }
 
   if(tableArea){
 
