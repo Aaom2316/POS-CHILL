@@ -26,6 +26,7 @@ POS.pages.sales = async function(){
     const [
       salesResult,
       orderResults,
+      pendingOrderResult,
       paidOrderResult,
       expenseResult,
       roundResult
@@ -97,6 +98,32 @@ POS.pages.sales = async function(){
         )
 
       ),
+
+
+      // ORDERS PENDING / บิลโต๊ะที่กดค้างจ่ายแล้ว
+      // PENDING_LIST แยกจาก LIST จึงต้องโหลดเพิ่ม
+      (async () => {
+        try{
+          const result = await POS.api.call(
+            POS_CONFIG.FUNCTION_NAMES.ORDERS,
+            {
+              method:"POST",
+              body:{ action:"PENDING_LIST" }
+            }
+          );
+
+          if(Array.isArray(result?.orders)){
+            return result.orders;
+          }
+          if(Array.isArray(result?.data)){
+            return result.data;
+          }
+          return [];
+        }catch(error){
+          console.error("LOAD PENDING ORDERS ERROR:", error);
+          return [];
+        }
+      })(),
 
 
       // ORDERS HISTORY
@@ -278,18 +305,24 @@ POS.pages.sales = async function(){
         ? orderResults.flat()
         : [];
 
+    const pendingOrderRows =
+      Array.isArray(pendingOrderResult)
+        ? pendingOrderResult
+        : [];
+
     const paidOrderRows =
       Array.isArray(paidOrderResult)
         ? paidOrderResult
         : [];
 
-    // ป้องกันรายการซ้ำ เพราะ PAID_LIST กับ LIST
-    // อาจมีบิลที่เป็นวันทำการปัจจุบันเหมือนกัน
+    // ป้องกันรายการซ้ำระหว่าง LIST, PENDING_LIST และ PAID_LIST
+    // PENDING_LIST จำเป็นสำหรับบิลโต๊ะที่ถูกพักไว้แล้ว
     const orderMap =
       new Map();
 
     [
       ...currentOrderRows,
+      ...pendingOrderRows,
       ...paidOrderRows
     ].forEach(
       row => {
@@ -1926,6 +1959,11 @@ const monthSalesRows = [
                 row?.sold_at ||
                 row?.created_at ||
                 null,
+              businessDateTime:
+                getBusinessDisplayDateTime(
+                  row?.sold_at ||
+                  row?.created_at
+                ),
               customerName:
                 String(
                   row?.customer_name ||
@@ -1983,6 +2021,12 @@ const monthSalesRows = [
             bill.createdAt =
               row.sold_at ||
               row.created_at;
+
+            bill.businessDateTime =
+              getBusinessDisplayDateTime(
+                row.sold_at ||
+                row.created_at
+              );
           }
         }
       }
@@ -2031,6 +2075,11 @@ const monthSalesRows = [
                 row?.ordered_at ||
                 row?.created_at ||
                 null,
+              businessDateTime:
+                getBusinessDisplayDateTime(
+                  row?.ordered_at ||
+                  row?.created_at
+                ),
               customerName:""
             }
           );
@@ -2074,6 +2123,12 @@ const monthSalesRows = [
             tablePending.createdAt =
               row.ordered_at ||
               row.created_at;
+
+            tablePending.businessDateTime =
+              getBusinessDisplayDateTime(
+                row.ordered_at ||
+                row.created_at
+              );
           }
         }
       }
@@ -2087,6 +2142,14 @@ const monthSalesRows = [
       (a,b) =>
         new Date(b.createdAt || 0) -
         new Date(a.createdAt || 0)
+    );
+
+  // ยอดค้างจ่ายรวมจากบิลที่แสดงทั้งหมด
+  const allPendingTotal =
+    allPendingBills.reduce(
+      (sum,bill) =>
+        sum + Number(bill.total || 0),
+      0
     );
 
   // ===================================================
@@ -3832,6 +3895,7 @@ const monthSalesRows = [
 
           <div class="pos-sales-pending-summary">
             ค้างจ่าย ${allPendingBills.length} บิล
+            • ยอดค้างจ่ายรวม ${money(allPendingTotal)} บาท
           </div>
 
           ${
@@ -3858,9 +3922,9 @@ const monthSalesRows = [
                           ${bill.source === "ORDERS" ? "หน้าโต๊ะ • " : ""}
                           ${bill.qty} รายการ •
                           ${
-                            bill.createdAt
+                            (bill.businessDateTime || bill.createdAt)
                               ? new Date(
-                                  bill.createdAt
+                                  bill.businessDateTime || bill.createdAt
                                 ).toLocaleString(
                                   "th-TH",
                                   {

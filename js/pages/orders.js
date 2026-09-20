@@ -4686,10 +4686,22 @@ POS.ordersRenderPendingBills = async function(){
         tableNo,
         billId,
         customerName: customerNameMap[key] || String(row.customer_name || "").trim(),
+        createdAt: row.ordered_at || row.created_at || null,
         items:[],
         total:0,
         qty:0
       };
+
+      // เก็บเวลารายการแรกของบิล เพื่อใช้แสดงวัน/เวลาที่สร้างบิล
+      const rowCreatedAt = row.ordered_at || row.created_at || null;
+      if(rowCreatedAt){
+        const currentTime = groups[key].createdAt ? new Date(groups[key].createdAt).getTime() : NaN;
+        const rowTime = new Date(rowCreatedAt).getTime();
+        if(!Number.isNaN(rowTime) && (Number.isNaN(currentTime) || rowTime < currentTime)){
+          groups[key].createdAt = rowCreatedAt;
+        }
+      }
+
       const menu = menuMap[String(row.menu_id)] || {};
       const qty = Number(row.qty || 0);
       const price = Number(row.unit_price ?? menu.price ?? 0);
@@ -4703,6 +4715,30 @@ POS.ordersRenderPendingBills = async function(){
       groups[key].qty += qty;
       groups[key].total += qty * price;
     });
+
+    // วันทำการอ่านจาก BILL ID (BYYYYMMDD...) ไม่อิงวันที่เครื่อง
+    const formatPendingBillDateTime = bill => {
+      const billDateMatch = String(bill.billId || "").match(/^B(\d{8})/);
+      const raw = billDateMatch ? billDateMatch[1] : "";
+      const businessDate = raw
+        ? `${raw.substring(0,4)}-${raw.substring(4,6)}-${raw.substring(6,8)}`
+        : "";
+
+      const timestamp = bill.createdAt ? new Date(bill.createdAt) : null;
+      const validTimestamp = timestamp && !Number.isNaN(timestamp.getTime());
+      const displayDate = businessDate ? new Date(`${businessDate}T00:00:00`) : timestamp;
+
+      if(!displayDate || Number.isNaN(displayDate.getTime())) return "วันที่ไม่ระบุ";
+
+      const dateText = displayDate.toLocaleDateString("th-TH", {
+        year:"numeric", month:"2-digit", day:"2-digit"
+      });
+      const timeText = validTimestamp
+        ? `${String(timestamp.getHours()).padStart(2,"0")}:${String(timestamp.getMinutes()).padStart(2,"0")}`
+        : "เวลาไม่ระบุ";
+
+      return `${dateText} ${timeText}`;
+    };
 
     const bills = Object.values(groups).sort((a,b) => a.tableNo-b.tableNo || a.billId.localeCompare(b.billId));
     if(count) count.textContent = `${bills.length} บิล`;
@@ -4720,6 +4756,7 @@ POS.ordersRenderPendingBills = async function(){
           <strong style="font-size:20px;color:#008f68;">${bill.total.toLocaleString("th-TH")} บาท</strong>
         </div>
         <div style="margin-top:7px;color:#64748b;font-size:14px;">บิล ${bill.billId} · ${bill.qty} รายการ</div>
+        <div style="margin-top:5px;color:#64748b;font-size:14px;">🗓️ วันที่ขาย · ${formatPendingBillDateTime(bill)}</div>
         <div style="margin-top:7px;color:#334155;font-size:15px;font-weight:700;">👤 ${bill.customerName ? escapeHtml(bill.customerName) : "ยังไม่ได้ระบุชื่อลูกค้า"}</div>
         <div style="margin-top:8px;color:#92400e;font-weight:700;">🟡 ค้างจ่าย · กดดูรายละเอียด/รับชำระ</div>
       </button>
