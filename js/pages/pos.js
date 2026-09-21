@@ -3386,6 +3386,9 @@ container.innerHTML = `
                     บิล ${bill.billId}
                   </div>
 
+                  <div style="margin-top:5px;color:#64748b;font-size:13px;">
+                    ${formatPendingBillSaleDate(bill.createdAt)}
+                  </div>
 
                   <div class="pos-pending-bill-info">
 
