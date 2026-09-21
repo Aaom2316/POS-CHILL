@@ -4794,6 +4794,30 @@ POS.ordersOpenPendingBill = async function(billId){
 
   const tableNo = Number(rows[0].table_no || 0);
 
+  // วันที่ขายใช้วันที่จากเลขบิล (BYYYYMMDD...) และเวลาเริ่มบิลจากรายการ
+  const billDateMatch = String(billId || "").match(/^B(\d{8})/);
+  const rawBillDate = billDateMatch ? billDateMatch[1] : "";
+  const businessDate = rawBillDate
+    ? `${rawBillDate.substring(0,4)}-${rawBillDate.substring(4,6)}-${rawBillDate.substring(6,8)}`
+    : "";
+
+  const pendingCreatedAt = rows
+    .map(row => row.ordered_at || row.created_at || null)
+    .filter(Boolean)
+    .sort((a,b) => new Date(a).getTime() - new Date(b).getTime())[0] || null;
+
+  const pendingTimestamp = pendingCreatedAt ? new Date(pendingCreatedAt) : null;
+  const validPendingTimestamp = pendingTimestamp && !Number.isNaN(pendingTimestamp.getTime());
+  const pendingDisplayDate = businessDate
+    ? new Date(`${businessDate}T00:00:00`)
+    : pendingTimestamp;
+  const pendingSoldDate = pendingDisplayDate && !Number.isNaN(pendingDisplayDate.getTime())
+    ? pendingDisplayDate.toLocaleDateString("th-TH", { year:"numeric", month:"2-digit", day:"2-digit" })
+    : "วันที่ไม่ระบุ";
+  const pendingSoldTime = validPendingTimestamp
+    ? `${String(pendingTimestamp.getHours()).padStart(2,"0")}:${String(pendingTimestamp.getMinutes()).padStart(2,"0")}`
+    : "เวลาไม่ระบุ";
+
   let customerName = String(rows[0].customer_name || "").trim();
   try{
     const customerResult = await POS.supabase
@@ -4841,6 +4865,7 @@ POS.ordersOpenPendingBill = async function(billId){
       <button type="button" onclick="document.getElementById('ordersPendingBillDetailModal')?.remove()" style="border:0;border-radius:50%;padding:8px 12px;cursor:pointer;">✕</button>
     </div>
     <div style="margin-top:8px;color:#64748b;">โต๊ะ ${tableNo} · บิล ${billId}</div>
+    <div style="margin-top:5px;color:#64748b;font-size:14px;">🗓️ วันที่ขาย · ${pendingSoldDate} ${pendingSoldTime}</div>
     <div style="margin-top:10px;padding:10px 12px;border-radius:9px;background:#f8fafc;color:#334155;font-weight:700;">👤 ชื่อลูกค้า: ${customerName ? escapeHtml(customerName) : "ยังไม่ได้ระบุชื่อลูกค้า"}</div>
     <div style="margin-top:16px;">${itemsHtml}</div>
     <div style="display:flex;justify-content:space-between;margin-top:18px;font-size:21px;font-weight:900;color:#008f68;">
