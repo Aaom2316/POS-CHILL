@@ -2034,6 +2034,36 @@ const monthSalesRows = [
 
 
   // ---------------------------------------------------
+  // ORDERS / โหลดชื่อลูกค้าจากฐานข้อมูลโดยตรง
+  // รองรับกรณี ORDERS LIST/PENDING_LIST ไม่ส่ง customer_name มา
+  // ผูกชื่อด้วย table_no + remark (เลขบิลของโต๊ะ)
+  // ---------------------------------------------------
+  const orderCustomerNameMap = new Map();
+
+  try{
+    if(POS.supabase && typeof POS.supabase.from === "function"){
+      const customerNameResult = await POS.supabase
+        .from("orders")
+        .select("table_no,remark,customer_name")
+        .eq("payment_status", "UNPAID");
+
+      if(!customerNameResult.error && Array.isArray(customerNameResult.data)){
+        customerNameResult.data.forEach(customerRow => {
+          const customerTableNo = String(customerRow?.table_no ?? "").trim();
+          const customerBillId = String(customerRow?.remark || customerRow?.bill_id || "").trim();
+          const customerName = String(customerRow?.customer_name || "").trim();
+          if(customerTableNo && customerBillId && customerName){
+            orderCustomerNameMap.set(`${customerTableNo}|${customerBillId}`, customerName);
+          }
+        });
+      }
+    }
+  }catch(customerNameError){
+    console.warn("LOAD SALES ORDER CUSTOMER NAMES ERROR:", customerNameError);
+  }
+
+
+  // ---------------------------------------------------
   // ORDERS / หน้าโต๊ะที่ยังไม่ได้รับชำระ
   // รวมรายการของโต๊ะเดียวกันเป็น 1 รายการ
   // ---------------------------------------------------
@@ -2080,13 +2110,20 @@ const monthSalesRows = [
                   row?.ordered_at ||
                   row?.created_at
                 ),
-              customerName:""
+              customerName:String(row?.customer_name || "").trim()
             }
           );
         }
 
         const tablePending =
           allPendingBillMap.get(tableKey);
+
+        // ชื่ออาจมากับ API หรือดึงจาก orders ด้วย table_no + เลขบิล
+        if(!tablePending.customerName){
+          const rowBillId = String(row?.remark || row?.bill_id || "").trim();
+          tablePending.customerName =
+            String(row?.customer_name || orderCustomerNameMap.get(`${tableNo}|${rowBillId}`) || "").trim();
+        }
 
         tablePending.total +=
           Number(row?.total || 0);
