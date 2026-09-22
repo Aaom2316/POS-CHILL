@@ -1284,5 +1284,59 @@ POS.api = {
 
   },
 
+
+  // =================================================
+  // MENU ADD
+  // เพิ่มเมนูใหม่ผ่าน MENU Edge Function
+  // =================================================
+
+  menuAdd(data) {
+
+    return this.call(
+      POS_CONFIG.FUNCTION_NAMES.MENU,
+      {
+        method: "POST",
+        body: {
+          action: "ADD",
+          sku: data.sku,
+          name: data.name,
+          category: data.category,
+          price: data.price,
+          emoji: data.emoji || "🍹",
+          active: data.active ?? true
+        }
+      }
+    );
+
+  },
+
+
+  // =================================================
+  // MENU UPDATE
+  // แก้ไขเมนูผ่าน MENU Edge Function
+  // =================================================
+
+  menuUpdate(data) {
+
+    return this.call(
+      POS_CONFIG.FUNCTION_NAMES.MENU,
+      {
+        method: "PUT",
+        body: {
+          action: "UPDATE",
+          id: data.id,
+          sku: data.sku,
+          name: data.name,
+          category: data.category,
+          price: data.price,
+          emoji: data.emoji,
+          active: data.active
+        }
+      }
+    );
+
+  },
+
+
 };
 
