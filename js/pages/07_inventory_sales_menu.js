@@ -138,7 +138,23 @@ POS.inventorySalesMenuRender = function(){
       .join(" ")
       .toLowerCase()
       .includes(keyword)
-  );
+  ).sort((a,b)=>{
+    const skuA = String(a.sku || "").trim();
+    const skuB = String(b.sku || "").trim();
+
+    const matchA = skuA.match(/^(.*?)(\d+)$/);
+    const matchB = skuB.match(/^(.*?)(\d+)$/);
+
+    if(matchA && matchB){
+      const prefixCompare = matchA[1].localeCompare(matchB[1], undefined, {numeric:true,sensitivity:"base"});
+      if(prefixCompare !== 0) return prefixCompare;
+
+      const numberCompare = Number(matchA[2]) - Number(matchB[2]);
+      if(numberCompare !== 0) return numberCompare;
+    }
+
+    return skuA.localeCompare(skuB, undefined, {numeric:true,sensitivity:"base"});
+  });
 
   const setText = (id,value)=>{
     const el = document.getElementById(id);

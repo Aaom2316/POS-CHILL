@@ -973,6 +973,29 @@ POS.inventoryCountRender = function(){
           .includes(search)
       );
 
+    }).sort((a,b) => {
+
+      const skuA =
+        String(a.sku || "")
+          .trim()
+          .toUpperCase();
+
+      const skuB =
+        String(b.sku || "")
+          .trim()
+          .toUpperCase();
+
+      const numA =
+        Number((skuA.match(/\d+/) || ["0"])[0]);
+
+      const numB =
+        Number((skuB.match(/\d+/) || ["0"])[0]);
+
+      if(numA !== numB){
+        return numA - numB;
+      }
+
+      return skuA.localeCompare(skuB);
     });
 
 
